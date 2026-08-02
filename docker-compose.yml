@@ -13,6 +13,8 @@ services:
       - MQTT_BROKER_HOST=mosquitto
       - REDIS_HOST=redis
       - POSTGRESQL_HOST=postgres
+      - MQTT_USERNAME=chirpstack
+      - MQTT_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
     ports:
       - "8080:8080"
 
@@ -27,9 +29,11 @@ services:
       - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}
       - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/state/{{ .StateType }}
       - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/command/#
+      - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
+      - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
     depends_on:
       - mosquitto
-  
+
   chirpstack-gateway-bridge-basicstation:
     image: chirpstack/chirpstack-gateway-bridge:4
     restart: unless-stopped
@@ -38,6 +42,9 @@ services:
       - "3001:3001"
     volumes:
       - ./configuration/chirpstack-gateway-bridge:/etc/chirpstack-gateway-bridge
+    environment:
+      - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
+      - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
     depends_on:
       - mosquitto
 
@@ -72,10 +79,29 @@ services:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - "1883:1883"
-    volumes: 
+      - "8883:8883"
+    environment:
+      - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+      - MOSQUITTO_N8N_PASSWORD=${MOSQUITTO_N8N_PASSWORD}
+    entrypoint: /bin/sh
+    user: root
+    command:
+      - -c
+      - |
+        rm -f /mosquitto/auth/passwd
+        mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd n8n "$$MOSQUITTO_N8N_PASSWORD"
+        chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
+        chmod 600 /mosquitto/auth/passwd
+        exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+    volumes:
       - ./configuration/mosquitto/config/:/mosquitto/config/
+      - mosquittoauth:/mosquitto/auth/
+      - ./configuration/mosquitto/certs/:/mosquitto/certs/
+      - mosquittodata:/mosquitto/data/
 
 volumes:
   postgresqldata:
   redisdata:
+  mosquittoauth:
+  mosquittodata:

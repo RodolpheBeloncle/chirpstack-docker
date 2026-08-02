@@ -414,6 +414,39 @@ Migration prod : durcir Mosquitto (auth + TLS) OU basculer sur §10 (VPS BasicSt
 
 ---
 
+## Experience 6 — Durcissement Mosquitto (auth + TLS + Let's Encrypt)
+
+**Date :** 2026-08-02
+**Objectif :** Supprimer l'anonyme, exposer un listener TLS 8883 sur Internet avec cert LE public, secrets dynamiques via `.env`.
+
+**Config finale :**
+- `mosquitto.conf` : `per_listener_settings true`, listener 1883 (LAN, auth passwd), listener 8883 (public, TLS 1.2, LE fullchain)
+- Users : `chirpstack` (services locaux) + `n8n` (consommateur distant), hashes argon2id, passwords 24 chars `openssl rand -base64 18`
+- `.env` : `MOSQUITTO_CHIRPSTACK_PASSWORD`, `MOSQUITTO_N8N_PASSWORD` (gitignoré)
+- Entrypoint Mosquitto : régénère `/mosquitto/auth/passwd` à chaque démarrage depuis env vars → passwords 100 % dynamiques, aucune valeur en dur dans `docker-compose.yml`
+- Certificat : Let's Encrypt HTTP-01 pour `mqtt.rodolphebeloncle.com` (A record Ionos → IP publique Livebox, port 80 forwardé pour renewal)
+- Port forward Livebox : 8883 → `192.168.1.14:8883` (1883 reste LAN-only)
+
+**Pièges rencontrés :**
+1. **Env substitution TOML ChirpStack ne fonctionne pas pour `[[regions]].gateway.backend.mqtt`** — chaque région enabled instancie un client MQTT distinct. Solution : réduire `enabled_regions` à `["eu868"]`.
+2. **chirpstack-gateway-bridge (Go) n'expand pas `$VAR` dans son TOML** — passé aux env vars natives `INTEGRATION__MQTT__AUTH__GENERIC__USERNAME` / `..._PASSWORD` dans `docker-compose.yml`.
+3. **Image `eclipse-mosquitto:2` (busybox) n'a pas `su-exec`** ; `setpriv --reuid` refusé par busybox. Solution : `user: root` dans compose, entrypoint fait `chown mosquitto` puis `exec su -s /bin/sh mosquitto -c "..."`.
+4. **Fichier `passwd` persistant** dans volume `mosquittoauth` : `mosquitto_passwd -c` échoue si le fichier existe. Solution : `rm -f` avant recréation à chaque démarrage.
+
+**Validation :**
+- Logs Mosquitto : tous clients internes `u'chirpstack'`, plus aucun `not authorised`
+- Test TLS externe :
+  ```
+  mosquitto_sub -h mqtt.rodolphebeloncle.com -p 8883 -u n8n -P '<pw>' \
+    --capath /etc/ssl/certs -t '$SYS/broker/version' -C 1
+  → mosquitto version 2.1.2
+  ```
+- n8n distant : credential MQTT ngrok:1883 → `mqtt.rodolphebeloncle.com:8883` TLS user `n8n`
+
+**Prochaine étape :** n8n Data Table pour mapper devEUI → nom device + node QuickChart pour visualiser batterie/RSSI dans le temps.
+
+---
+
 ## Annexes — Fichiers modifies
 
 - `chirpstack-docker/docker-compose.yml`

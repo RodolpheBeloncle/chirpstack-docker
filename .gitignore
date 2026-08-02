@@ -5,3 +5,7 @@
 # data folder
 /data
 /lorawan-devices
+
+# secrets & deployment-specific certs (LE certs rotate every 90d)
+configuration/mosquitto/certs/
+
