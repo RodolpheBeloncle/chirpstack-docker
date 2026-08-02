@@ -212,11 +212,28 @@ mosquitto_sub -h mqtt.rodolphebeloncle.com -p 8883 -u n8n -P '<pw>' \
 
 La gateway continue de causer avec l'ancienne infra (semtech-udp ou BasicStation vers l'ancien host). Pour la basculer vers le VPS :
 
-### Cas 1 — Gateway parle UDP Packet Forwarder (semtech-udp, port 1700)
-Interface web Dragino (`http://<gateway-lan-ip>/`) → **LoRaWAN → LoRaWAN --> Semtech UDP** :
-- **Server address** : `mqtt.rodolphebeloncle.com` (ou IP VPS directe)
-- **Server port up/down** : `1700`
-- Sauver → Redémarrer
+### Cas 1 — Gateway parle UDP Packet Forwarder (semtech-udp, port 1700) — **CAS ACTUEL**
+
+Interface web Dragino (`http://<IP-LAN-gateway>/`, login `root`) → **LoRaWAN → LoRaWAN → Semtech UDP GWMP**.
+
+| Champ | Avant (Mac LAN) | Après (VPS) |
+|---|---|---|
+| Protocol | Semtech UDP GWMP | Semtech UDP GWMP (inchangé) |
+| Server Address | `192.168.1.14` | `mqtt.rodolphebeloncle.com` (ou IP VPS) |
+| Server Port Up | `1700` | `1700` |
+| Server Port Down | `1700` | `1700` |
+
+Sauver → Reboot gateway (ou SSH : `/etc/init.d/lora_pkt_fwd restart`).
+
+**Pièges Dragino :**
+- Cache DNS local → prévoir 5-10 min après changement, ou reboot pour forcer
+- Vérifier que la box maison autorise UDP sortant vers le VPS (normalement OK par défaut)
+- Le keepalive PULL_DATA toutes les 10s maintient le NAT ouvert pour les downlinks (natif, rien à faire)
+
+**Vérif après cutover :**
+1. SSH gateway : `logread | grep -i pkt_fwd` → uplinks envoyés vers le VPS
+2. VPS : `docker compose logs chirpstack-gateway-bridge | tail -20` → uplinks reçus
+3. ChirpStack UI (`http://<IP-VPS>:8080`) → Gateways → **Last seen** se rafraîchit
 
 ⚠️ **Sur le VPS**, ouvrir UDP 1700 dans UFW :
 ```bash
