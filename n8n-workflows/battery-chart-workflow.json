@@ -117,8 +117,8 @@
       "parameters": {
         "chartType": "line",
         "labelsMode": "array",
-        "labelsArray": "={{ $json.map(r => new Date(r.createdAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})) }}",
-        "data": "={{ $json.map(r => r.batteryPercent) }}",
+        "labelsArray": "={{ $input.all().map(i => new Date(i.json.createdAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})) }}",
+        "data": "={{ $input.all().map(i => i.json.batteryPercent) }}",
         "chartOptions": {
           "backgroundColor": "#ffffff",
           "format": "png",
@@ -126,7 +126,7 @@
           "height": 400
         },
         "datasetOptions": {
-          "label": "={{ 'Batterie % - ' + ($('Lookup Device').item.json.deviceName || $('Normalize').item.json.devEUI) }}",
+          "label": "={{ 'Batterie % - ' + ($('Lookup Device').first().json.deviceName || $('Normalize').first().json.devEUI) }}",
           "borderColor": "#2e7d32",
           "backgroundColor": "rgba(46,125,50,0.15)",
           "fill": true,
@@ -138,7 +138,8 @@
       "typeVersion": 1,
       "position": [1100, 0],
       "id": "quickchart",
-      "name": "Battery Chart"
+      "name": "Battery Chart",
+      "executeOnce": true
     }
   ],
   "connections": {
