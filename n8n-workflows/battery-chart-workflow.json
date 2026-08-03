@@ -24,11 +24,12 @@
         "duplicateItem": false,
         "assignments": {
           "assignments": [
-            { "id": "1", "name": "devEUI", "value": "={{ $json.message.deviceInfo.devEui }}", "type": "string" },
-            { "id": "2", "name": "batteryMv", "value": "={{ $json.message.object.batteryMv }}", "type": "number" },
-            { "id": "3", "name": "batteryPercent", "value": "={{ $json.message.object.batteryPercent }}", "type": "number" },
-            { "id": "4", "name": "rssi", "value": "={{ $json.message.rxInfo[0].rssi }}", "type": "number" },
-            { "id": "5", "name": "snr", "value": "={{ $json.message.rxInfo[0].snr }}", "type": "number" }
+            { "id": "0", "name": "msg", "value": "={{ JSON.parse($json.message) }}", "type": "object" },
+            { "id": "1", "name": "devEUI", "value": "={{ JSON.parse($json.message).deviceInfo.devEui }}", "type": "string" },
+            { "id": "2", "name": "batteryMv", "value": "={{ JSON.parse($json.message).object.battery_mv }}", "type": "number" },
+            { "id": "3", "name": "batteryPercent", "value": "={{ JSON.parse($json.message).object.battery_percent }}", "type": "number" },
+            { "id": "4", "name": "rssi", "value": "={{ JSON.parse($json.message).rxInfo[0].rssi }}", "type": "number" },
+            { "id": "5", "name": "snr", "value": "={{ JSON.parse($json.message).rxInfo[0].snr }}", "type": "number" }
           ]
         },
         "options": {}
