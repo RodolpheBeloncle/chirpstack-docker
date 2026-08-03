@@ -1,0 +1,151 @@
+{
+  "name": "LoRaWAN - Store + Chart Battery",
+  "nodes": [
+    {
+      "parameters": {
+        "topics": "application/+/device/+/event/up",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mqttTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "mqtt-trigger",
+      "name": "MQTT Uplink",
+      "credentials": {
+        "mqtt": {
+          "id": "REPLACE_WITH_MQTT_CRED_ID",
+          "name": "Mosquitto TLS Rokodo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            { "id": "1", "name": "devEUI", "value": "={{ $json.message.deviceInfo.devEui }}", "type": "string" },
+            { "id": "2", "name": "batteryMv", "value": "={{ $json.message.object.batteryMv }}", "type": "number" },
+            { "id": "3", "name": "batteryPercent", "value": "={{ $json.message.object.batteryPercent }}", "type": "number" },
+            { "id": "4", "name": "rssi", "value": "={{ $json.message.rxInfo[0].rssi }}", "type": "number" },
+            { "id": "5", "name": "snr", "value": "={{ $json.message.rxInfo[0].snr }}", "type": "number" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 0],
+      "id": "normalize",
+      "name": "Normalize"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": { "__rl": true, "mode": "name", "value": "battery_readings" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "devEUI": "={{ $json.devEUI }}",
+            "batteryMv": "={{ $json.batteryMv }}",
+            "batteryPercent": "={{ $json.batteryPercent }}",
+            "rssi": "={{ $json.rssi }}",
+            "snr": "={{ $json.snr }}"
+          },
+          "schema": [
+            { "id": "devEUI", "displayName": "devEUI", "type": "string", "canBeUsedToMatch": true, "display": true },
+            { "id": "batteryMv", "displayName": "batteryMv", "type": "number", "display": true },
+            { "id": "batteryPercent", "displayName": "batteryPercent", "type": "number", "display": true },
+            { "id": "rssi", "displayName": "rssi", "type": "number", "display": true },
+            { "id": "snr", "displayName": "snr", "type": "number", "display": true }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [440, 0],
+      "id": "insert-reading",
+      "name": "Store Reading"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": { "__rl": true, "mode": "name", "value": "devices" },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            { "keyName": "devEUI", "condition": "eq", "keyValue": "={{ $('Normalize').item.json.devEUI }}" }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [660, 0],
+      "id": "lookup-device",
+      "name": "Lookup Device"
+    },
+    {
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": { "__rl": true, "mode": "name", "value": "battery_readings" },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            { "keyName": "devEUI", "condition": "eq", "keyValue": "={{ $('Normalize').item.json.devEUI }}" }
+          ]
+        },
+        "returnAll": false,
+        "limit": 50,
+        "orderBy": true,
+        "orderByColumn": "createdAt",
+        "orderByDirection": "ASC"
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [880, 0],
+      "id": "fetch-history",
+      "name": "Fetch History"
+    },
+    {
+      "parameters": {
+        "chartType": "line",
+        "labelsMode": "array",
+        "labelsArray": "={{ $json.map(r => new Date(r.createdAt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})) }}",
+        "data": "={{ $json.map(r => r.batteryPercent) }}",
+        "chartOptions": {
+          "backgroundColor": "#ffffff",
+          "format": "png",
+          "width": 800,
+          "height": 400
+        },
+        "datasetOptions": {
+          "label": "={{ 'Batterie % - ' + ($('Lookup Device').item.json.deviceName || $('Normalize').item.json.devEUI) }}",
+          "borderColor": "#2e7d32",
+          "backgroundColor": "rgba(46,125,50,0.15)",
+          "fill": true,
+          "pointStyle": "circle"
+        },
+        "output": "chart"
+      },
+      "type": "n8n-nodes-base.quickChart",
+      "typeVersion": 1,
+      "position": [1100, 0],
+      "id": "quickchart",
+      "name": "Battery Chart"
+    }
+  ],
+  "connections": {
+    "MQTT Uplink":   { "main": [[{ "node": "Normalize",     "type": "main", "index": 0 }]] },
+    "Normalize":     { "main": [[{ "node": "Store Reading", "type": "main", "index": 0 }]] },
+    "Store Reading": { "main": [[{ "node": "Lookup Device", "type": "main", "index": 0 }]] },
+    "Lookup Device": { "main": [[{ "node": "Fetch History", "type": "main", "index": 0 }]] },
+    "Fetch History": { "main": [[{ "node": "Battery Chart", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
