@@ -98,7 +98,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Espaces de l'app = **pièces (areas) HA** (Maison : caméra ; Jardin : sonde, vanne). Registres + états resynchronisés toutes les 10 s.
 - App renommée **IoTrigger**, logo source `mobile/assets/logo.png` (icônes = recadrage carré via `sips`).
 - Domaine HA : `homeassistant.triggerstudio.dev` (`jardin.` retiré). Clé API `COOLIFY_API_KEY` (.env) = write+deploy ; tâche planifiée créée via `POST /services/<uuid>/scheduled-tasks`.
-- Sauvegarde : service `backup` + tâche planifiée Coolify `0 3 1 * *` → `/opt/backups/jardin.tar.gz` (écrasé chaque mois ;
+- Sauvegarde : service `backup` + tâche planifiée Coolify `0 3 1 * *` → `/opt/backups/iot-stack.tar.gz` (tâche `iot-stack-backup`) (écrasé chaque mois ;
   contient configuration/, mosquitto, dump ChirpStack ; pas les enregistrements Frigate). Copie hors VPS à prévoir.
 - Notifs : canal `alerts_v2` (vibration, visible écran verrouillé). La notif « Surveillance active » (service de premier plan)
   n'est pas balayable sous Android 12 → la masquer via Paramètres notification > canal « Service ».
@@ -109,3 +109,5 @@ Demande : l'utilisateur = admin, sa compagne = viewer (lecture seule, accès res
 Pistes : utilisateurs HA non-admin + un token par utilisateur (au lieu du token admin unique dans `config.ts`) ;
 SSO Google = OIDC devant HA (pas natif : proxy type Authelia/authentik, ou composant custom `hass-openid`).
 Les registres HA (`config/*`) exigent admin → l'app doit masquer ＋/espaces/retrait pour un viewer. À cadrer avec `/architect`.
+- Domaines HTTPS = **onglet Domains Coolify** (API : `PATCH /services/<uuid>` champ `urls` [{name, url avec :port}]), plus de labels Traefik.
+  Ressource renommée « IOT STACK » (projet « Projet Iot ») par l'utilisateur.

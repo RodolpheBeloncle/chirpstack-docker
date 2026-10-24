@@ -3,9 +3,6 @@
 # Données en place : bind mounts absolus /opt/jardin/configuration/* + volumes jardin_* existants (external).
 # Secrets : variables ${...} à renseigner dans l'onglet Environment Variables de Coolify (valeurs de /opt/jardin/.env).
 networks:
-  coolify:
-    external: true
-    name: coolify
   default: {}
 services:
   chirpstack:
@@ -33,18 +30,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=coolify
-      - traefik.http.routers.chirpstack.rule=Host(`chirpstack.triggerstudio.dev`)
-      - traefik.http.routers.chirpstack.entrypoints=https
-      - traefik.http.routers.chirpstack.tls.certresolver=letsencrypt
-      - traefik.http.routers.chirpstack-http.rule=Host(`chirpstack.triggerstudio.dev`)
-      - traefik.http.routers.chirpstack-http.entrypoints=http
-      - traefik.http.routers.chirpstack-http.middlewares=jardin-https
-      - traefik.http.services.chirpstack.loadbalancer.server.port=8080
     networks:
-      coolify: null
       default: null
     ports:
       - host_ip: 10.77.0.1
@@ -208,19 +194,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=coolify
-      - traefik.http.routers.jardin.rule=Host(`homeassistant.triggerstudio.dev`)
-      - traefik.http.routers.jardin.entrypoints=https
-      - traefik.http.routers.jardin.tls.certresolver=letsencrypt
-      - traefik.http.routers.jardin-http.rule=Host(`homeassistant.triggerstudio.dev`)
-      - traefik.http.routers.jardin-http.entrypoints=http
-      - traefik.http.routers.jardin-http.middlewares=jardin-https
-      - traefik.http.middlewares.jardin-https.redirectscheme.scheme=https
-      - traefik.http.services.jardin.loadbalancer.server.port=8123
     networks:
-      coolify: null
       default: null
     restart: unless-stopped
     volumes:

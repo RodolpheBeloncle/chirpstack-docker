@@ -1,5 +1,5 @@
 # Serveur Coolify : docker compose -f docker-compose.yml -f docker-compose.coolify.yml up -d
-# Aucun port publié : HA passe par Traefik (coolify-proxy) en HTTPS, le reste reste interne.
+# Aucun port publié. Domaines HTTPS (HA, ChirpStack) configurés dans Coolify (onglet Domains), pas en labels.
 # La caméra (192.168.1.16) et la future gateway LoRa sont joignables via le tunnel WireGuard wg0.
 services:
   # UIs internes : uniquement sur l'IP WireGuard du serveur (VPN téléphone), jamais sur Internet
@@ -21,18 +21,6 @@ services:
 
   homeassistant:
     ports: !reset []
-    networks: [default, coolify]
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=coolify
-      - traefik.http.routers.jardin.rule=Host(`homeassistant.triggerstudio.dev`)
-      - traefik.http.routers.jardin.entrypoints=https
-      - traefik.http.routers.jardin.tls.certresolver=letsencrypt
-      - traefik.http.routers.jardin-http.rule=Host(`homeassistant.triggerstudio.dev`)
-      - traefik.http.routers.jardin-http.entrypoints=http
-      - traefik.http.routers.jardin-http.middlewares=jardin-https
-      - traefik.http.middlewares.jardin-https.redirectscheme.scheme=https
-      - traefik.http.services.jardin.loadbalancer.server.port=8123
 
   backup:
     # Conteneur outil : la tâche planifiée Coolify (1er du mois) y exécute la sauvegarde, écrasant la précédente
@@ -52,6 +40,3 @@ services:
       - mosquittodata:/mosquitto:ro
       - /opt/backups:/backups
 
-networks:
-  coolify:
-    external: true
