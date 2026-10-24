@@ -11,4 +11,4 @@ export const SENSORS = [
   { id: 'sensor.sonde_signal_snr', label: 'Signal (SNR)' },
 ];
 export const VALVE = 'switch.vanne_jardin';
-export const CAMERA = 'camera.jardin';
+export const CAMERA = 'camera.jardin_sd'; // flux SD : plus stable en 4G (HD = camera.jardin)
