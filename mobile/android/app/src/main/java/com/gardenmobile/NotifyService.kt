@@ -20,7 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-// Notifications sans Firebase : WebSocket HA permanent, abonné à l'événement `jardin_notify`
+// Notifications sans Firebase : WebSocket HA permanent, abonné à `sensor.notification` (événement `iotrigger_notify`)
 // (data: title, message), déclenché par les automatisations HA.
 class NotifyService : Service() {
   private val client = OkHttpClient.Builder().pingInterval(30, TimeUnit.SECONDS).build()

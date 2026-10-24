@@ -1,27 +1,27 @@
-# Notifications vers l'app Android (NotifyService.kt écoute l'événement `jardin_notify`)
-- id: jardin_notif_sol_sec
-  alias: "Jardin : sol sec"
+# Notifications vers l'app Android (événement `iotrigger_notify` → sensor.notification → NotifyService.kt)
+- id: iotrigger_notif_sol_sec
+  alias: "Notification : sol sec"
   trigger:
     - platform: numeric_state
       entity_id: sensor.sol_humidite
       below: 20  # seuil à ajuster une fois la sonde en place
       for: "00:30:00"
   action:
-    - event: jardin_notify
+    - event: iotrigger_notify
       event_data:
         # Espace (pièce HA) de l'appareil : suit les déplacements faits dans l'app
         title: "Sol sec ({{ area_name('sensor.sol_humidite') or 'jardin' }})"
         message: "Humidité du sol à {{ states('sensor.sol_humidite') }} %"
 
-- id: jardin_notif_personne
-  alias: "Jardin : personne détectée"
+- id: iotrigger_notif_personne
+  alias: "Notification : personne détectée"
   trigger:
     - platform: mqtt
       topic: frigate/events
   condition:
     - "{{ trigger.payload_json.type == 'new' and trigger.payload_json.after.label == 'person' }}"
   action:
-    - event: jardin_notify
+    - event: iotrigger_notify
       event_data:
         title: "Personne détectée ({{ area_name('camera.jardin_sd') or 'caméra' }})"
         message: "Détection caméra à {{ now().strftime('%H:%M') }}"

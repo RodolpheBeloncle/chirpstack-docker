@@ -147,7 +147,7 @@ function Home({
     return () => clearInterval(t);
   }, [reload, refresh]);
 
-  // Notifications : service Android natif (NotifyService.kt) abonné à l'événement HA `jardin_notify`
+  // Notifications : service Android natif (NotifyService.kt) abonné à `sensor.notification` (alimenté par l'événement `iotrigger_notify`)
   useEffect(() => {
     PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS').then(
       () => NativeModules.Notify.start(HA_URL, token),

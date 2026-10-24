@@ -7,7 +7,7 @@ frontend:
   themes: !include_dir_merge_named themes
 
 automation: !include automations.yaml
-automation jardin: !include automations_jardin.yaml
+automation iotrigger: !include automations_iotrigger.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
@@ -96,12 +96,12 @@ openid:
   use_pkce: true
   openid_text: "Se connecter avec Google"
 
-# Dernière notification (événement jardin_notify) en état d'entité : les comptes non-admin ne peuvent pas
+# Dernière notification (événement iotrigger_notify) en état d'entité : les comptes non-admin ne peuvent pas
 # s'abonner à un événement custom, mais peuvent suivre une entité (NotifyService.kt : subscribe_entities)
 template:
   - trigger:
       - trigger: event
-        event_type: jardin_notify
+        event_type: iotrigger_notify
     sensor:
       - name: Notification
         unique_id: iotrigger_notification

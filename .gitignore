@@ -13,7 +13,7 @@ configuration/mosquitto/certs/
 configuration/homeassistant/*
 !configuration/homeassistant/configuration.yaml
 !configuration/homeassistant/dashboards/
-!configuration/homeassistant/automations_jardin.yaml
+!configuration/homeassistant/automations_iotrigger.yaml
 configuration/frigate/*
 !configuration/frigate/config.yml
 
