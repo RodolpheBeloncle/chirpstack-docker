@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { HA_URL } from './config';
-import { callService, Device, EntityState } from './ha';
+import { Area, callService, Device, EntityState } from './ha';
 
 type States = Record<string, EntityState>;
 
@@ -203,12 +203,16 @@ export function DeviceSheet({
   onClose,
   onChange,
   onRemove,
+  areas,
+  onArea,
 }: {
   device: Device | null;
   states: States;
   onClose: () => void;
   onChange: () => void;
   onRemove: (d: Device) => void;
+  areas: Area[];
+  onArea: (d: Device, areaId: string) => void;
 }) {
   return (
     <Modal
@@ -237,6 +241,22 @@ export function DeviceSheet({
                 dev={device}
                 onChange={onChange}
               />
+            ))}
+          </View>
+          <Text style={s.area}>Espace</Text>
+          <View style={s.chips}>
+            {areas.map(a => (
+              <Pressable
+                key={a.area_id}
+                style={[s.chip, device.areaId === a.area_id && s.chipOn]}
+                onPress={() => onArea(device, a.area_id)}
+              >
+                <Text
+                  style={[s.chipTxt, device.areaId === a.area_id && s.chipTxtOn]}
+                >
+                  {a.name}
+                </Text>
+              </Pressable>
             ))}
           </View>
           <Pressable onPress={() => onRemove(device)} style={s.remove}>

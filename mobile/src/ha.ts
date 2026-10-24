@@ -63,6 +63,7 @@ export type Device = {
   id: string;
   name: string;
   area: string;
+  areaId: string | null;
   inApp: boolean;
   entities: string[];
 };
@@ -70,26 +71,37 @@ export type Device = {
 const APP_LABEL = 'app';
 
 // Appareils HA + leurs entités visibles. Un appareil est dans l'app s'il porte le libellé `app`.
-export async function loadDevices(): Promise<Device[]> {
+export type Area = { area_id: string; name: string };
+
+// Espaces de l'app = pièces (areas) HA
+export async function loadDevices(): Promise<{ devices: Device[]; areas: Area[] }> {
   const [devices, entities, areas] = await Promise.all([
     ws<any[]>('config/device_registry/list'),
     ws<any[]>('config/entity_registry/list'),
     ws<any[]>('config/area_registry/list'),
   ]);
   const areaName = Object.fromEntries(areas.map(a => [a.area_id, a.name]));
-  return devices
+  const list = devices
     .filter(d => !d.disabled_by && d.entry_type !== 'service')
     .map(d => ({
       id: d.id,
       name: d.name_by_user ?? d.name,
       area: areaName[d.area_id] ?? '',
+      areaId: d.area_id,
       inApp: d.labels.includes(APP_LABEL),
       entities: entities
         .filter(e => e.device_id === d.id && !e.hidden_by && !e.disabled_by)
         .map(e => e.entity_id),
     }))
     .filter(d => d.entities.length);
+  return { devices: list, areas };
 }
+
+export const createArea = (name: string) =>
+  ws<Area>('config/area_registry/create', { name });
+
+export const setArea = (device: Device, areaId: string) =>
+  ws('config/device_registry/update', { device_id: device.id, area_id: areaId });
 
 export async function setInApp(device: Device, inApp: boolean) {
   const labels = await ws<any[]>('config/label_registry/list');

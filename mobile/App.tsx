@@ -10,6 +10,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -17,11 +18,14 @@ import Video from 'react-native-video';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { HA_TOKEN, HA_URL, CAMERA } from './src/config';
 import {
+  Area,
+  createArea,
   Device,
   EntityState,
   ha,
   hlsUrl,
   loadDevices,
+  setArea,
   setInApp,
 } from './src/ha';
 import { AddSheet, C, DeviceCard, DeviceSheet } from './src/Devices';
@@ -33,10 +37,19 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [space, setSpace] = useState<string | null>(null);
+  const [newSpace, setNewSpace] = useState<string | null>(null);
 
+  // Synchro HA toutes les 10 s : registres (appareils, espaces, libellés) + états
   const refresh = useCallback(async () => {
     try {
-      const list: EntityState[] = await ha('states');
+      const [reg, list] = await Promise.all([
+        loadDevices(),
+        ha('states') as Promise<EntityState[]>,
+      ]);
+      setDevices(reg.devices);
+      setAreas(reg.areas);
       setStates(Object.fromEntries(list.map(st => [st.entity_id, st])));
       setError(null);
     } catch (e) {
@@ -46,14 +59,8 @@ function App() {
 
   const reload = useCallback(async () => {
     setLoading(true);
-    try {
-      setDevices(await loadDevices());
-      await refresh();
-    } catch (e) {
-      setError(`Appareils : ${(e as Error).message}`);
-    } finally {
-      setLoading(false);
-    }
+    await refresh();
+    setLoading(false);
   }, [refresh]);
 
   useEffect(() => {
@@ -102,7 +109,36 @@ function App() {
     return () => clearInterval(t);
   }, [stream]);
 
-  const mine = devices.filter(d => d.inApp);
+  const run = async (p: Promise<unknown>) => {
+    try {
+      await p;
+      reload();
+    } catch (e) {
+      setError(`Mise à jour : ${(e as Error).message}`);
+    }
+  };
+  const addSpace = async () => {
+    const name = newSpace?.trim();
+    setNewSpace(null);
+    if (!name) return;
+    try {
+      setSpace((await createArea(name)).area_id);
+      reload();
+    } catch (e) {
+      setError(`Espace : ${(e as Error).message}`);
+    }
+  };
+
+  const inApp = devices.filter(d => d.inApp);
+  // Espaces affichés = ceux qui contiennent un appareil de l'app ; espace courant par défaut = le premier
+  const spaces = areas.filter(
+    a => a.area_id === space || inApp.some(d => d.areaId === a.area_id),
+  );
+  const current = spaces.some(a => a.area_id === space)
+    ? space
+    : spaces[0]?.area_id ?? null;
+  const mine = inApp.filter(d => !current || d.areaId === current);
+  const showCamera = mine.some(d => d.entities.includes(CAMERA));
 
   // Grille responsive : colonnes de ~170 px min, contenu centré et borné sur tablette
   const { width } = useWindowDimensions();
@@ -121,7 +157,9 @@ function App() {
           }
         >
           <View style={s.head}>
-            <Text style={s.title}>Jardin</Text>
+            <Text style={s.title}>
+              {spaces.find(a => a.area_id === current)?.name ?? 'Accueil'}
+            </Text>
             <Pressable
               onPress={() => setAdding(true)}
               style={({ pressed }) => [s.add, pressed && { opacity: 0.6 }]}
@@ -131,7 +169,36 @@ function App() {
           </View>
           {error && <Text style={s.error}>{error}</Text>}
 
-          {stream ? (
+          <ScrollView horizontal contentContainerStyle={s.tabs}>
+            {spaces.map(a => (
+              <Pressable
+                key={a.area_id}
+                onPress={() => setSpace(a.area_id)}
+                style={[s.tab, a.area_id === current && s.tabOn]}
+              >
+                <Text style={[s.tabTxt, a.area_id === current && s.tabTxtOn]}>
+                  {a.name}
+                </Text>
+              </Pressable>
+            ))}
+            {newSpace === null ? (
+              <Pressable onPress={() => setNewSpace('')} style={s.tab}>
+                <Text style={s.tabTxt}>＋ Espace</Text>
+              </Pressable>
+            ) : (
+              <TextInput
+                autoFocus
+                placeholder="Nom (ex. Maison)"
+                value={newSpace}
+                onChangeText={setNewSpace}
+                onSubmitEditing={addSpace}
+                onBlur={addSpace}
+                style={[s.tab, s.tabInput]}
+              />
+            )}
+          </ScrollView>
+
+          {!showCamera ? null : stream ? (
             <Video
               style={s.camera}
               source={{
@@ -188,12 +255,23 @@ function App() {
           onClose={() => setOpenId(null)}
           onChange={refresh}
           onRemove={d => toggle(d, false)}
+          areas={areas}
+          onArea={(d, id) => {
+            setSpace(id);
+            run(setArea(d, id));
+          }}
         />
         <AddSheet
           visible={adding}
           devices={devices.filter(d => !d.inApp)}
           onClose={() => setAdding(false)}
-          onAdd={d => toggle(d, true)}
+          onAdd={d =>
+            run(
+              setInApp(d, true).then(
+                () => current && !d.areaId && setArea(d, current),
+              ),
+            ).then(() => setAdding(false))
+          }
         />
       </SafeAreaView>
     </SafeAreaProvider>
@@ -240,6 +318,17 @@ const s = StyleSheet.create({
   },
   section: { color: C.text, fontSize: 22, fontWeight: '700', marginTop: 8 },
   hint: { color: C.muted, fontSize: 15 },
+  tabs: { gap: 8 },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: C.card,
+  },
+  tabOn: { backgroundColor: C.text },
+  tabTxt: { color: C.text, fontSize: 15, fontWeight: '600' },
+  tabTxtOn: { color: C.card },
+  tabInput: { minWidth: 160, fontSize: 15, color: C.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 });
 
