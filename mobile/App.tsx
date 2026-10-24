@@ -1,85 +1,66 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
+  AppState,
   Image,
   NativeModules,
   PermissionsAndroid,
+  Pressable,
   RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Video from 'react-native-video';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HA_TOKEN, HA_URL, CAMERA, SENSORS, VALVE } from './src/config';
-
-type State = {
-  state: string;
-  attributes: { unit_of_measurement?: string; entity_picture?: string };
-};
-
-// Home Assistant REST API : GET /api/states/<id>, POST /api/services/<domain>/<service>
-async function ha(path: string, body?: object) {
-  const res = await fetch(`${HA_URL}/api/${path}`, {
-    method: body ? 'POST' : 'GET',
-    headers: {
-      Authorization: `Bearer ${HA_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: body && JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-// Flux HLS : HA ne l'expose qu'en WebSocket (camera/stream) → URL signée /api/hls/<token>/master_playlist.m3u8
-function hlsUrl(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${HA_URL.replace(/^http/, 'ws')}/api/websocket`);
-    ws.onmessage = e => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'auth_required')
-        ws.send(JSON.stringify({ type: 'auth', access_token: HA_TOKEN }));
-      else if (msg.type === 'auth_ok')
-        ws.send(
-          JSON.stringify({ id: 1, type: 'camera/stream', entity_id: CAMERA }),
-        );
-      else if (msg.type === 'result') {
-        ws.close();
-        msg.success
-          ? resolve(`${HA_URL}${msg.result.url}`)
-          : reject(new Error(msg.error?.message));
-      } else if (msg.type === 'auth_invalid') reject(new Error('token refusé'));
-    };
-    ws.onerror = () => reject(new Error('WebSocket HA injoignable'));
-  });
-}
+import { HA_TOKEN, HA_URL, CAMERA } from './src/config';
+import {
+  Device,
+  EntityState,
+  ha,
+  hlsUrl,
+  loadDevices,
+  setInApp,
+} from './src/ha';
+import { AddSheet, C, DeviceCard, DeviceSheet } from './src/Devices';
 
 function App() {
-  const [states, setStates] = useState<Record<string, State>>({});
+  const [states, setStates] = useState<Record<string, EntityState>>({});
+  const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     try {
-      const ids = [...SENSORS.map(s => s.id), VALVE, CAMERA];
-      const list: State[] = await Promise.all(
-        ids.map(id => ha(`states/${id}`)),
-      );
-      setStates(Object.fromEntries(ids.map((id, i) => [id, list[i]])));
+      const list: EntityState[] = await ha('states');
+      setStates(Object.fromEntries(list.map(st => [st.entity_id, st])));
       setError(null);
     } catch (e) {
-      setError(
-        `Home Assistant injoignable (${HA_URL}) : ${(e as Error).message}`,
-      );
+      setError(`Home Assistant injoignable : ${(e as Error).message}`);
+    }
+  }, []);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      setDevices(await loadDevices());
+      await refresh();
+    } catch (e) {
+      setError(`Appareils : ${(e as Error).message}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refresh]);
+
+  useEffect(() => {
+    reload();
+    const t = setInterval(refresh, 10000);
+    return () => clearInterval(t);
+  }, [reload, refresh]);
 
   // Notifications : service Android natif (NotifyService.kt) abonné à l'événement HA `jardin_notify`
   useEffect(() => {
@@ -88,126 +69,178 @@ function App() {
     );
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 15000);
-    return () => clearInterval(t);
-  }, [refresh]);
-
-  const toggleValve = async (on: boolean) => {
+  const toggle = async (d: Device, inApp: boolean) => {
     try {
-      await ha(`services/switch/turn_${on ? 'on' : 'off'}`, {
-        entity_id: VALVE,
-      });
-      refresh();
+      await setInApp(d, inApp);
+      setOpenId(null);
+      setAdding(false);
+      reload();
     } catch (e) {
-      setError(`Commande vanne échouée : ${(e as Error).message}`);
+      setError(`Mise à jour : ${(e as Error).message}`);
     }
   };
 
   // Vidéo HLS ; en cas d'échec, repli sur le snapshot HA rafraîchi chaque seconde
   const [stream, setStream] = useState<string | null>(null);
   const [frame, setFrame] = useState(0);
-  useEffect(() => {
-    hlsUrl().then(setStream, e => setError(`Vidéo : ${e.message}`));
+  // Nouvelle URL = retour au direct : au lancement, au retour au premier plan, et après une erreur
+  const openStream = useCallback(() => {
+    setStream(null);
+    hlsUrl(CAMERA).then(setStream, e => setError(`Vidéo : ${e.message}`));
   }, []);
+  useEffect(() => {
+    openStream();
+    const sub = AppState.addEventListener(
+      'change',
+      st => st === 'active' && openStream(),
+    );
+    return () => sub.remove();
+  }, [openStream]);
   useEffect(() => {
     if (stream) return;
     const t = setInterval(() => setFrame(f => f + 1), 1000);
     return () => clearInterval(t);
   }, [stream]);
 
-  const valveOn = states[VALVE]?.state === 'on';
+  const mine = devices.filter(d => d.inApp);
+
+  // Grille responsive : colonnes de ~170 px min, contenu centré et borné sur tablette
+  const { width } = useWindowDimensions();
+  const inner = Math.min(width, 900) - 32;
+  const cols = Math.max(2, Math.floor((inner + GAP) / (170 + GAP)));
+  const cardW = (inner - GAP * (cols - 1)) / cols;
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
       <SafeAreaView style={s.root}>
         <ScrollView
           contentContainerStyle={s.content}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={refresh} />
+            <RefreshControl refreshing={loading} onRefresh={reload} />
           }
         >
-          <Text style={s.title}>Jardin</Text>
+          <View style={s.head}>
+            <Text style={s.title}>Jardin</Text>
+            <Pressable
+              onPress={() => setAdding(true)}
+              style={({ pressed }) => [s.add, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={s.addTxt}>＋</Text>
+            </Pressable>
+          </View>
           {error && <Text style={s.error}>{error}</Text>}
 
           {stream ? (
             <Video
               style={s.camera}
-              source={{ uri: stream }}
+              source={{
+                uri: stream,
+                // Petit tampon + vitesse ajustée pour rester ~2 s derrière le direct (sinon dérive de minutes)
+                bufferConfig: {
+                  minBufferMs: 1000,
+                  maxBufferMs: 4000,
+                  bufferForPlaybackMs: 500,
+                  bufferForPlaybackAfterRebufferMs: 1000,
+                  live: {
+                    targetOffsetMs: 2000,
+                    maxOffsetMs: 6000,
+                    maxPlaybackSpeed: 1.1,
+                  },
+                },
+              }}
               muted
               resizeMode="contain"
-              onError={() => setStream(null)}
+              onError={() => setTimeout(openStream, 2000)}
             />
           ) : (
-            <>
-              {/* entity_picture = URL signée par HA (token tournant, rafraîchi avec les états) */}
-              <Image
-                style={s.camera}
-                fadeDuration={0}
-                onError={e => setError(`Caméra : ${e.nativeEvent.error}`)}
-                source={{
-                  uri: `${HA_URL}${states[CAMERA]?.attributes.entity_picture}&t=${frame}`,
-                }}
-              />
-            </>
+            // entity_picture = URL signée par HA (token tournant, rafraîchi avec les états)
+            <Image
+              style={s.camera}
+              fadeDuration={0}
+              source={{
+                uri: `${HA_URL}${states[CAMERA]?.attributes.entity_picture}&t=${frame}`,
+              }}
+            />
           )}
 
-          <View style={[s.card, s.valve]}>
-            <View>
-              <Text style={s.valveLabel}>Vanne d'arrosage</Text>
-              <Text style={s.muted}>{valveOn ? 'Ouverte' : 'Fermée'}</Text>
-            </View>
-            <Switch value={valveOn} onValueChange={toggleValve} />
+          <Text style={s.section}>Appareils</Text>
+          {mine.length === 0 && !loading && (
+            <Text style={s.hint}>Touchez ＋ pour ajouter un appareil.</Text>
+          )}
+          <View style={s.grid}>
+            {mine.map(d => (
+              <DeviceCard
+                key={d.id}
+                device={d}
+                states={states}
+                width={cardW}
+                onOpen={() => setOpenId(d.id)}
+                onChange={refresh}
+              />
+            ))}
           </View>
-
-          {SENSORS.map(({ id, label }) => {
-            const st = states[id];
-            return (
-              <View key={id} style={s.card}>
-                <Text style={s.muted}>{label}</Text>
-                {st ? (
-                  <Text style={s.value}>
-                    {st.state} {st.attributes.unit_of_measurement ?? ''}
-                  </Text>
-                ) : (
-                  <ActivityIndicator />
-                )}
-              </View>
-            );
-          })}
         </ScrollView>
+
+        <DeviceSheet
+          device={mine.find(d => d.id === openId) ?? null}
+          states={states}
+          onClose={() => setOpenId(null)}
+          onChange={refresh}
+          onRemove={d => toggle(d, false)}
+        />
+        <AddSheet
+          visible={adding}
+          devices={devices.filter(d => !d.inApp)}
+          onClose={() => setAdding(false)}
+          onAdd={d => toggle(d, true)}
+        />
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
+const GAP = 12;
+
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0f1a14' },
-  content: { padding: 16, gap: 12 },
-  title: { color: '#e8f5ec', fontSize: 32, fontWeight: '700', marginBottom: 8 },
-  error: {
-    color: '#ffb4a8',
-    backgroundColor: '#3a1d19',
-    padding: 12,
-    borderRadius: 10,
+  root: { flex: 1, backgroundColor: C.bg },
+  content: {
+    padding: 16,
+    gap: GAP,
+    width: '100%',
+    maxWidth: 900,
+    alignSelf: 'center',
   },
-  card: { backgroundColor: '#1a2b21', borderRadius: 14, padding: 16 },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  title: { color: C.text, fontSize: 34, fontWeight: '700' },
+  add: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addTxt: { color: '#007aff', fontSize: 24 },
+  error: {
+    color: '#c0392b',
+    backgroundColor: '#fdecea',
+    padding: 12,
+    borderRadius: 12,
+  },
   camera: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 14,
-    backgroundColor: '#1a2b21',
+    borderRadius: 20,
+    backgroundColor: '#000',
   },
-  valve: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  valveLabel: { color: '#e8f5ec', fontSize: 18, fontWeight: '600' },
-  muted: { color: '#8fb39c', fontSize: 14 },
-  value: { color: '#e8f5ec', fontSize: 28, fontWeight: '600', marginTop: 4 },
+  section: { color: C.text, fontSize: 22, fontWeight: '700', marginTop: 8 },
+  hint: { color: C.muted, fontSize: 15 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
 });
 
 export default App;

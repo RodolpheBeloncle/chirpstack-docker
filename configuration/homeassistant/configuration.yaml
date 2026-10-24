@@ -18,29 +18,38 @@ mqtt:
     - name: "Sol humidité"
       unique_id: demo_sol_humidite
       state_topic: "application/demo/device/a840410000000001/event/up"
+      device: &sonde
+        identifiers: [a840410000000001]
+        name: "Sonde jardin"
+        manufacturer: Dragino
+        model: SE01-LS
       value_template: "{{ value_json.object.water_SOIL }}"
       unit_of_measurement: "%"
       device_class: moisture
     - name: "Sol température"
       unique_id: demo_sol_temperature
       state_topic: "application/demo/device/a840410000000001/event/up"
+      device: *sonde
       value_template: "{{ value_json.object.temp_SOIL }}"
       unit_of_measurement: "°C"
       device_class: temperature
     - name: "Sol conductivité"
       unique_id: demo_sol_ec
       state_topic: "application/demo/device/a840410000000001/event/up"
+      device: *sonde
       value_template: "{{ value_json.object.conduct_SOIL }}"
       unit_of_measurement: "µS/cm"
     - name: "Sonde batterie"
       unique_id: demo_sonde_batterie
       state_topic: "application/demo/device/a840410000000001/event/up"
+      device: *sonde
       value_template: "{{ value_json.object.BatV }}"
       unit_of_measurement: "V"
       device_class: voltage
     - name: "Sonde signal (SNR)"
       unique_id: demo_sonde_snr
       state_topic: "application/demo/device/a840410000000001/event/up"
+      device: *sonde
       value_template: "{{ value_json.rxInfo[0].snr }}"
       unit_of_measurement: "dB"
   switch:
@@ -51,6 +60,10 @@ mqtt:
       payload_on: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AQ=="}'
       payload_off: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AA=="}'
       optimistic: true
+      device:
+        identifiers: [a840410000000002]
+        name: "Vanne jardin"
+        manufacturer: Dragino
 
 # Dashboard "Jardin" versionné en YAML (configuration/homeassistant/dashboards/jardin.yaml)
 lovelace:
