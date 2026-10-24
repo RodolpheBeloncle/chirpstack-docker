@@ -33,8 +33,12 @@ Contraintes exprimées :
   `docker compose -f docker-compose.yml -f docker-compose.coolify.yml up -d`. Aucun port publié.
 - HA public : https://jardin.triggerstudio.dev (labels Traefik dans `docker-compose.coolify.yml`).
 - WireGuard : serveur `10.77.0.1` (`/etc/wireguard/wg0.conf`, route 192.168.1.16 via le pair maison) ;
-  maison `10.77.0.2` = conteneur `wireguard` (`docker-compose.home.yml`, projet `jardin-home`, conf gitignorée).
-  Plus tard : le Pi remplace le Mac comme pair maison. Stack locale du Mac arrêtée.
+  maison `10.77.0.2` = **Raspberry Pi** (WireGuard natif `/etc/wireguard/wg0.conf`, `wg-quick@wg0` activé, mêmes clés
+  que l'ancien conteneur Mac `docker-compose.home.yml`, désormais arrêté). Stack locale du Mac arrêtée.
+- Gateway LoRa = le même Pi : `ssh rodolphe@192.168.1.23` (`dragino-a3a5c3`, Raspbian 12 armv7l, **clé uniquement**,
+  mot de passe désactivé), HAT PG1302 (SX1302), gateway ID `a84041fdfea3a5c3`, service `draginofwd`
+  (`/etc/lora/local_conf.json` → `server_address 10.77.0.1:1700`, backup `.bak`). Serveur : gateway-bridge publié sur
+  `10.77.0.1:1700/udp` + règle DOCKER-USER `-s 10.77.0.2 udp 1700` (persistée dans wg0.conf).
 
 Ajouter un appareil : suivre `HA_DEVICE_INTEGRATION.md`.
 Sécuriser la caméra (pas de cloud) : `CAMERA_SECURITY.md`. Agent DVR désinstallé (remplacé par Frigate).
@@ -64,9 +68,12 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Tunnel durci : PresharedKey (serveur `/etc/wireguard/home.psk`) ; côté maison seul `wg0 → 192.168.1.16:554` est forwardé (reste DROP) ;
   côté serveur rien n'entre depuis wg0 (INPUT/DOCKER-USER DROP hors réponses). Gateway LoRa plus tard = ouvrir explicitement son flux (UDP 1700 ou MQTT).
 - Let's Encrypt : 5 échecs/h max par domaine (DNS absent = échec) → ne lancer Traefik qu'après propagation DNS.
+- Pi : `iptables` absent par défaut sur bookworm → `apt install iptables` avant wg-quick. Config serveur LoRa dans `local_conf.json` (pas `global_conf.json`).
 - Mosquitto sans ACL : tous les users voient tous les topics. À corriger avant exposition.
 
 ## Prochaines étapes (ordre)
+
+0. **Créer la gateway `a84041fdfea3a5c3` dans ChirpStack** (http://10.77.0.1:8081 via VPN), sinon ses trames sont ignorées.
 
 1. **Tester l'app** sur le téléphone avec la démo (simulateur lancé, token HA dans `mobile/src/config.ts`).
 2. **Quand la SE01-LS arrive** : l'enregistrer dans ChirpStack (EU868, OTAA, codec Dragino

@@ -7,7 +7,7 @@ services:
     ports: !override ["10.77.0.1:8081:8080"]  # 8080 pris par coolify-proxy
     #]
   chirpstack-gateway-bridge:
-    ports: !reset []
+    ports: !override ["10.77.0.1:1700:1700/udp"]  # Semtech UDP, gateway Pi via wg0 uniquement
   chirpstack-gateway-bridge-basicstation:
     ports: !reset []
   chirpstack-rest-api:
