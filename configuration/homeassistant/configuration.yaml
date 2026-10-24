@@ -95,3 +95,15 @@ openid:
   create_user: false
   use_pkce: true
   openid_text: "Se connecter avec Google"
+
+# Dernière notification (événement jardin_notify) en état d'entité : les comptes non-admin ne peuvent pas
+# s'abonner à un événement custom, mais peuvent suivre une entité (NotifyService.kt : subscribe_entities)
+template:
+  - trigger:
+      - trigger: event
+        event_type: jardin_notify
+    sensor:
+      - name: Notification
+        unique_id: iotrigger_notification
+        # horodatage en tête : chaque notification change l'état, même identique à la précédente
+        state: "{{ now().timestamp() | int }}|{{ trigger.event.data.title }}|{{ trigger.event.data.message }}"

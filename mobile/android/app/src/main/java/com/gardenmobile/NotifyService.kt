@@ -16,6 +16,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -60,11 +61,16 @@ class NotifyService : Service() {
         val msg = JSONObject(text)
         when (msg.optString("type")) {
           "auth_required" -> webSocket.send(JSONObject().put("type", "auth").put("access_token", token).toString())
-          "auth_ok" -> webSocket.send(JSONObject().put("id", 1).put("type", "subscribe_events")
-              .put("event_type", "jardin_notify").toString())
+          // subscribe_entities sur sensor.notification : autorisé aussi aux comptes non-admin
+          "auth_ok" -> webSocket.send(JSONObject().put("id", 1).put("type", "subscribe_entities")
+              .put("entity_ids", JSONArray().put("sensor.notification")).toString())
           "event" -> {
-            val d = msg.getJSONObject("event").getJSONObject("data")
-            show(d.optString("title", "Jardin"), d.optString("message"))
+            // "a" = état initial (ignoré), "c" = changement ; état = "horodatage|titre|message"
+            val st = msg.getJSONObject("event").optJSONObject("c")?.optJSONObject("sensor.notification")
+                ?.optJSONObject("+")?.optString("s") ?: return
+            val d = st.split("|", limit = 3)
+            if (d.size < 3) return
+            show(d[1].ifBlank { "Notification" }, d[2])
           }
         }
       }
