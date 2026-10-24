@@ -33,7 +33,7 @@ class NotifyService : Service() {
     channels()
     val fg = Notification.Builder(this, CH_SERVICE)
         .setSmallIcon(R.mipmap.ic_launcher)
-        .setContentTitle("Jardin")
+        .setContentTitle("IoTrigger")
         .setContentText("Surveillance active")
         .setContentIntent(openApp())
         .build()
@@ -86,6 +86,8 @@ class NotifyService : Service() {
         .setContentText(text)
         .setStyle(Notification.BigTextStyle().bigText(text))
         .setAutoCancel(true)
+        .setVisibility(Notification.VISIBILITY_PUBLIC)
+        .setCategory(Notification.CATEGORY_ALARM)
         .setContentIntent(openApp())
         .build()
     getSystemService(NotificationManager::class.java).notify(System.currentTimeMillis().toInt(), n)
@@ -97,13 +99,20 @@ class NotifyService : Service() {
   private fun channels() {
     val nm = getSystemService(NotificationManager::class.java)
     nm.createNotificationChannel(NotificationChannel(CH_SERVICE, "Service", NotificationManager.IMPORTANCE_MIN))
-    nm.createNotificationChannel(NotificationChannel(CH_ALERTS, "Alertes jardin", NotificationManager.IMPORTANCE_HIGH))
+    // Réglages d'un canal figés à sa création → nouvel id pour activer vibration + écran verrouillé
+    nm.deleteNotificationChannel("alerts")
+    nm.createNotificationChannel(
+        NotificationChannel(CH_ALERTS, "Alertes", NotificationManager.IMPORTANCE_HIGH).apply {
+          enableVibration(true)
+          vibrationPattern = longArrayOf(0, 400, 200, 400)
+          lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        })
   }
 
   companion object {
     const val PREFS = "notify"
     private const val CH_SERVICE = "service"
-    private const val CH_ALERTS = "alerts"
+    private const val CH_ALERTS = "alerts_v2"
 
     fun start(ctx: Context) = ctx.startForegroundService(Intent(ctx, NotifyService::class.java))
   }

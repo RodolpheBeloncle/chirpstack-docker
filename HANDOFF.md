@@ -34,7 +34,7 @@ Contraintes exprimées :
   `docker compose -f docker-compose.yml -f docker-compose.coolify.yml config --no-interpolate` puis volumes `external`),
   à coller dans l'UI Coolify. Secrets = variables d'env Coolify. Données en place : `/opt/jardin/configuration/*`
   (bind mounts absolus) + volumes `jardin_*` (external). **Ne jamais relancer `docker compose up` dans /opt/jardin.**
-- HA public : https://homeassistant.triggerstudio.dev (ancien `jardin.` encore routé) ; ChirpStack public : https://chirpstack.triggerstudio.dev (mdp admin changé).
+- HA public : https://homeassistant.triggerstudio.dev ; ChirpStack public : https://chirpstack.triggerstudio.dev (mdp admin changé).
 - Healthchecks sur tous les services (visibles dans Coolify). ChirpStack : tester `127.0.0.1`, pas `localhost` (IPv6 → refus).
   Gateway-bridge : healthcheck via métriques Prometheus `:9100`.
 - WireGuard : serveur `10.77.0.1` (`/etc/wireguard/wg0.conf`, route 192.168.1.16 via le pair maison) ;
@@ -97,6 +97,15 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Caméra TC55 : pas d'ONVIF ; PTZ éventuel via l'API hi3510 (identifiants admin requis, à tester si motorisée).
 - Espaces de l'app = **pièces (areas) HA** (Maison : caméra ; Jardin : sonde, vanne). Registres + états resynchronisés toutes les 10 s.
 - App renommée **IoTrigger**, logo source `mobile/assets/logo.png` (icônes = recadrage carré via `sips`).
-- Domaine HA : `homeassistant.triggerstudio.dev` (+ `jardin.` gardé en transition). Clé API `COOLIFY_API_KEY` (.env) = write+deploy ; tâche planifiée créée via `POST /services/<uuid>/scheduled-tasks`.
+- Domaine HA : `homeassistant.triggerstudio.dev` (`jardin.` retiré). Clé API `COOLIFY_API_KEY` (.env) = write+deploy ; tâche planifiée créée via `POST /services/<uuid>/scheduled-tasks`.
 - Sauvegarde : service `backup` + tâche planifiée Coolify `0 3 1 * *` → `/opt/backups/jardin.tar.gz` (écrasé chaque mois ;
   contient configuration/, mosquitto, dump ChirpStack ; pas les enregistrements Frigate). Copie hors VPS à prévoir.
+- Notifs : canal `alerts_v2` (vibration, visible écran verrouillé). La notif « Surveillance active » (service de premier plan)
+  n'est pas balayable sous Android 12 → la masquer via Paramètres notification > canal « Service ».
+
+## Prochaine session : rôles admin / viewer + SSO Google
+
+Demande : l'utilisateur = admin, sa compagne = viewer (lecture seule, accès restreint), connexion via SSO Google.
+Pistes : utilisateurs HA non-admin + un token par utilisateur (au lieu du token admin unique dans `config.ts`) ;
+SSO Google = OIDC devant HA (pas natif : proxy type Authelia/authentik, ou composant custom `hass-openid`).
+Les registres HA (`config/*`) exigent admin → l'app doit masquer ＋/espaces/retrait pour un viewer. À cadrer avec `/architect`.
