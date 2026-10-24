@@ -2,8 +2,10 @@
 # Aucun port publié : HA passe par Traefik (coolify-proxy) en HTTPS, le reste reste interne.
 # La caméra (192.168.1.16) et la future gateway LoRa sont joignables via le tunnel WireGuard wg0.
 services:
+  # UIs internes : uniquement sur l'IP WireGuard du serveur (VPN téléphone), jamais sur Internet
   chirpstack:
-    ports: !reset []
+    ports: !override ["10.77.0.1:8081:8080"]  # 8080 pris par coolify-proxy
+    #]
   chirpstack-gateway-bridge:
     ports: !reset []
   chirpstack-gateway-bridge-basicstation:
@@ -13,9 +15,9 @@ services:
   mosquitto:
     ports: !reset []
   go2rtc:
-    ports: !reset []
+    ports: !override ["10.77.0.1:1984:1984"]
   frigate:
-    ports: !reset []
+    ports: !override ["10.77.0.1:8971:8971"]
 
   homeassistant:
     ports: !reset []
