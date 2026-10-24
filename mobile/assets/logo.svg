@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#0b3a6b"/><stop offset="1" stop-color="#020b1c"/>
+    </radialGradient>
+    <radialGradient id="orb" cx="40%" cy="35%" r="70%">
+      <stop offset="0" stop-color="#7ff3ff"/><stop offset=".45" stop-color="#1aa6e8"/><stop offset="1" stop-color="#06306b"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="hex" width="28" height="48.5" patternUnits="userSpaceOnUse" patternTransform="scale(.9)">
+      <path d="M14 0 28 8v16L14 32 0 24V8zM14 32v16.5M0 24l-14 8M28 24l14 8" fill="none" stroke="#bff8ff" stroke-opacity=".35" stroke-width="1.4"/>
+    </pattern>
+    <clipPath id="c"><circle cx="256" cy="256" r="150"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="196" fill="none" stroke="#3fd0ff" stroke-opacity=".25" stroke-width="2" stroke-dasharray="4 10"/>
+  <circle cx="256" cy="256" r="150" fill="url(#orb)" filter="url(#glow)"/>
+  <rect width="512" height="512" fill="url(#hex)" clip-path="url(#c)"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#c9fbff" stroke-opacity=".7" stroke-width="3"/>
+  <g fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" filter="url(#glow)">
+    <path d="M200 196a80 80 0 0 1 112 0"/><path d="M222 220a48 48 0 0 1 68 0"/>
+  </g>
+  <path d="M256 362c-58-18-74-70-46-120 50 2 84 30 82 82-2 18-14 32-36 38z" fill="#e9fff4" filter="url(#glow)"/>
+  <path d="M256 360c-4-36-14-66-36-96" fill="none" stroke="#1aa67a" stroke-width="7" stroke-linecap="round"/>
+</svg>
