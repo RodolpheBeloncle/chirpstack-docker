@@ -29,8 +29,11 @@ Contraintes exprimées :
 
 ### Déploiement serveur (Coolify, 31.70.69.194)
 
-- Repo rsync dans `/opt/jardin` (sans .git/mobile), lancé par
-  `docker compose -f docker-compose.yml -f docker-compose.coolify.yml up -d`. Aucun port publié.
+- **Stack gérée par Coolify** (https://coolify.triggerstudio.dev → projet `jardin` → ressource `jardin-stack`, uuid
+  `8q3bqxofsb5unbrb3s7nm2ed`). Source du compose = `docker-compose.coolify-ui.yml` (régénérer via
+  `docker compose -f docker-compose.yml -f docker-compose.coolify.yml config --no-interpolate` puis volumes `external`),
+  à coller dans l'UI Coolify. Secrets = variables d'env Coolify. Données en place : `/opt/jardin/configuration/*`
+  (bind mounts absolus) + volumes `jardin_*` (external). **Ne jamais relancer `docker compose up` dans /opt/jardin.**
 - HA public : https://jardin.triggerstudio.dev (labels Traefik dans `docker-compose.coolify.yml`).
 - WireGuard : serveur `10.77.0.1` (`/etc/wireguard/wg0.conf`, route 192.168.1.16 via le pair maison) ;
   maison `10.77.0.2` = **Raspberry Pi** (WireGuard natif `/etc/wireguard/wg0.conf`, `wg-quick@wg0` activé, mêmes clés
@@ -61,7 +64,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
   fixer son IP en DHCP statique (sinon `go2rtc.yaml` casse). Lecture live HEVC dans le navigateur : OK Safari, variable sur Chrome.
 - Frigate : `detect: enabled: true` obligatoire (sinon detect/state OFF). Intégration Frigate dans HA = composant custom (HACS cassé → install manuelle si besoin).
 - **HA 2026 : section YAML `http:` ignorée** (`yaml_migration_done` dans `.storage/http`). Reverse proxy = éditer
-  `.storage/http` (HA arrêté) : `use_x_forwarded_for: true`, `trusted_proxies: ["10.0.1.0/24"]` (réseau `coolify`).
+  `.storage/http` (HA arrêté) : `use_x_forwarded_for: true`, `trusted_proxies: ["10.0.1.0/24", "10.0.8.0/24"]` sous `data.stable` (10.0.8.0/24 = réseau Coolify de la ressource).
 - Serveur : certs Mosquitto copiés depuis le Mac (uid 501) → `chown -R 1883:1883 configuration/mosquitto/certs`.
 - Tunnel WireGuard sur **UDP 4500** (autorisé par défaut par la Livebox, IPSEC-NAT-T) + règle entrante UDP 4500 dans le pare-feu de l'hébergeur. Clamp MSS (TCPMSS) obligatoire des deux côtés, sinon RTSP en timeout.
 - VPN téléphone : pair `10.77.0.3` (conf `/etc/wireguard/phone.conf` sur le serveur, QR via qrencode). UIs sur l'IP VPN seulement : ChirpStack http://10.77.0.1:8081 (8080 = coolify-proxy), go2rtc :1984, Frigate https://10.77.0.1:8971. wg0 doit être up avant docker au boot.

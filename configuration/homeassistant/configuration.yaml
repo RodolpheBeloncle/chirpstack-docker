@@ -62,7 +62,7 @@ lovelace:
       show_in_sidebar: true
 
 # Reverse proxy Traefik (Coolify) : HA 2026 ignore la section YAML `http:` (migrée dans .storage/http).
-# Sur le serveur, .storage/http contient use_x_forwarded_for: true + trusted_proxies: [10.0.1.0/24].
+# Sur le serveur, .storage/http contient use_x_forwarded_for: true + trusted_proxies: [10.0.1.0/24, 10.0.8.0/24] (sous data.stable).
 
 # go2rtc externe (service docker-compose) à la place du go2rtc intégré
 go2rtc:

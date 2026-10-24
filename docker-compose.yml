@@ -82,7 +82,6 @@ services:
       - "8883:8883"
     environment:
       - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
-      - MOSQUITTO_N8N_PASSWORD=${MOSQUITTO_N8N_PASSWORD}
       - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
       - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
     entrypoint: /bin/sh
@@ -92,7 +91,6 @@ services:
       - |
         rm -f /mosquitto/auth/passwd
         mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
-        mosquitto_passwd -b /mosquitto/auth/passwd n8n "$$MOSQUITTO_N8N_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd frigate "$$MOSQUITTO_FRIGATE_PASSWORD"
         chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data

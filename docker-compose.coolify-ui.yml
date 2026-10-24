@@ -1,0 +1,268 @@
+# Ressource Coolify "Docker Compose Empty" (coller ce fichier dans l'UI Coolify).
+# Généré depuis docker-compose.yml + docker-compose.coolify.yml (docker compose config --no-interpolate).
+# Données en place : bind mounts absolus /opt/jardin/configuration/* + volumes jardin_* existants (external).
+# Secrets : variables ${...} à renseigner dans l'onglet Environment Variables de Coolify (valeurs de /opt/jardin/.env).
+networks:
+  coolify:
+    external: true
+    name: coolify
+  default: {}
+services:
+  chirpstack:
+    command: -c /etc/chirpstack
+    depends_on:
+      mosquitto:
+        condition: service_started
+        required: true
+      postgres:
+        condition: service_started
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      - MQTT_BROKER_HOST=mosquitto
+      - REDIS_HOST=redis
+      - POSTGRESQL_HOST=postgres
+      - MQTT_USERNAME=chirpstack
+      - MQTT_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+    image: chirpstack/chirpstack:4
+    networks:
+      default: null
+    ports:
+      - host_ip: 10.77.0.1
+        mode: ingress
+        protocol: tcp
+        published: "8081"
+        target: 8080
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/chirpstack
+        target: /etc/chirpstack
+        type: bind
+  chirpstack-gateway-bridge:
+    depends_on:
+      mosquitto:
+        condition: service_started
+        required: true
+    environment:
+      - INTEGRATION__MQTT__EVENT_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/event/{{ .EventType }}
+      - INTEGRATION__MQTT__STATE_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/state/{{ .StateType }}
+      - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/command/#
+      - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
+      - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+    image: chirpstack/chirpstack-gateway-bridge:4
+    networks:
+      default: null
+    ports:
+      - host_ip: 10.77.0.1
+        mode: ingress
+        protocol: udp
+        published: "1700"
+        target: 1700
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/chirpstack-gateway-bridge
+        target: /etc/chirpstack-gateway-bridge
+        type: bind
+  chirpstack-gateway-bridge-basicstation:
+    command: -c /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge-basicstation-eu868.toml
+    depends_on:
+      mosquitto:
+        condition: service_started
+        required: true
+    environment:
+      - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
+      - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+    image: chirpstack/chirpstack-gateway-bridge:4
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/chirpstack-gateway-bridge
+        target: /etc/chirpstack-gateway-bridge
+        type: bind
+  chirpstack-rest-api:
+    command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure
+    depends_on:
+      chirpstack:
+        condition: service_started
+        required: true
+    image: chirpstack/chirpstack-rest-api:4
+    networks:
+      default: null
+    restart: unless-stopped
+  frigate:
+    depends_on:
+      go2rtc:
+        condition: service_started
+        required: true
+      mosquitto:
+        condition: service_started
+        required: true
+    environment:
+      - TZ=Europe/Paris
+      - FRIGATE_MQTT_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
+    image: ghcr.io/blakeblackshear/frigate:stable
+    networks:
+      default: null
+    ports:
+      - host_ip: 10.77.0.1
+        mode: ingress
+        protocol: tcp
+        published: "8971"
+        target: 8971
+    restart: unless-stopped
+    shm_size: 256mb
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/frigate
+        target: /config
+        type: bind
+      - source: frigatemedia
+        target: /media/frigate
+        type: volume
+        volume: {}
+      - target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+        type: tmpfs
+  go2rtc:
+    image: alexxit/go2rtc:1.9.9
+    networks:
+      default: null
+    ports:
+      - host_ip: 10.77.0.1
+        mode: ingress
+        protocol: tcp
+        published: "1984"
+        target: 1984
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/go2rtc
+        target: /config
+        type: bind
+  homeassistant:
+    depends_on:
+      mosquitto:
+        condition: service_started
+        required: true
+    environment:
+      - TZ=Europe/Paris
+    image: ghcr.io/home-assistant/home-assistant:stable
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.jardin.rule=Host(`jardin.triggerstudio.dev`)
+      - traefik.http.routers.jardin.entrypoints=https
+      - traefik.http.routers.jardin.tls.certresolver=letsencrypt
+      - traefik.http.routers.jardin-http.rule=Host(`jardin.triggerstudio.dev`)
+      - traefik.http.routers.jardin-http.entrypoints=http
+      - traefik.http.routers.jardin-http.middlewares=jardin-https
+      - traefik.http.middlewares.jardin-https.redirectscheme.scheme=https
+      - traefik.http.services.jardin.loadbalancer.server.port=8123
+    networks:
+      coolify: null
+      default: null
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/homeassistant
+        target: /config
+        type: bind
+  mosquitto:
+    command:
+      - -c
+      - |
+        rm -f /mosquitto/auth/passwd
+        mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd frigate "$$MOSQUITTO_FRIGATE_PASSWORD"
+        chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
+        chmod 600 /mosquitto/auth/passwd
+        exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
+    entrypoint: /bin/sh
+    environment:
+      - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+      - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
+      - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
+    image: eclipse-mosquitto:2
+    networks:
+      default: null
+    restart: unless-stopped
+    user: root
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/mosquitto/config
+        target: /mosquitto/config
+        type: bind
+      - source: mosquittoauth
+        target: /mosquitto/auth
+        type: volume
+        volume: {}
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/mosquitto/certs
+        target: /mosquitto/certs
+        type: bind
+      - source: mosquittodata
+        target: /mosquitto/data
+        type: volume
+        volume: {}
+  postgres:
+    environment:
+      - POSTGRES_USER=chirpstack
+      - POSTGRES_PASSWORD=chirpstack
+      - POSTGRES_DB=chirpstack
+    image: postgres:14-alpine
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - bind:
+          create_host_path: true
+        source: /opt/jardin/configuration/postgresql/initdb
+        target: /docker-entrypoint-initdb.d
+        type: bind
+      - source: postgresqldata
+        target: /var/lib/postgresql/data
+        type: volume
+        volume: {}
+  redis:
+    command: redis-server --save 300 1 --save 60 100 --appendonly no
+    image: redis:7-alpine
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - source: redisdata
+        target: /data
+        type: volume
+        volume: {}
+volumes:
+  frigatemedia:
+    name: jardin_frigatemedia
+    external: true
+  mosquittoauth:
+    name: jardin_mosquittoauth
+    external: true
+  mosquittodata:
+    name: jardin_mosquittodata
+    external: true
+  postgresqldata:
+    name: jardin_postgresqldata
+    external: true
+  redisdata:
+    name: jardin_redisdata
+    external: true
