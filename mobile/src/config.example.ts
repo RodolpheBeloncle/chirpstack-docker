@@ -11,3 +11,4 @@ export const SENSORS = [
   { id: 'sensor.sonde_signal_snr', label: 'Signal (SNR)' },
 ];
 export const VALVE = 'switch.vanne_jardin';
+export const CAMERA = 'camera.jardin';

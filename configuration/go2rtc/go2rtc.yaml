@@ -1,0 +1,10 @@
+# Restream local des caméras (connexion RTSP native : le wrapper ffmpeg du go2rtc intégré à HA échoue sur la Teruhal TC55)
+streams:
+  camera_jardin: rtsp://192.168.1.16:554/live/ch00_0
+  camera_jardin_sd: rtsp://192.168.1.16:554/live/ch00_1
+api:
+  listen: ":1984"
+rtsp:
+  listen: ":8554"
+webrtc:
+  listen: ":8555"

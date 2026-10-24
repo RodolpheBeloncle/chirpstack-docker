@@ -1,0 +1,11 @@
+# Maison (Mac aujourd'hui, Raspberry Pi plus tard) : tunnel sortant vers le serveur Coolify.
+# docker compose -f docker-compose.home.yml up -d   — aucun port à ouvrir sur la Livebox.
+services:
+  wireguard:
+    image: lscr.io/linuxserver/wireguard:1.0.20250521
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]
+    sysctls:
+      - net.ipv4.ip_forward=1
+    volumes:
+      - ./configuration/wireguard-home:/config   # wg_confs/wg0.conf : clé privée, gitignoré

@@ -12,3 +12,9 @@ configuration/mosquitto/certs/
 
 configuration/homeassistant/*
 !configuration/homeassistant/configuration.yaml
+!configuration/homeassistant/dashboards/
+configuration/frigate/*
+!configuration/frigate/config.yml
+
+# Clé privée WireGuard maison
+configuration/wireguard-home/

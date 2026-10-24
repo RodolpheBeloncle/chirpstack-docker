@@ -1,0 +1,49 @@
+# Frigate : détection (personne, chat, chien, oiseau) + enregistrement sur mouvement.
+# Flux lus via le service go2rtc (pas de connexion directe à la caméra).
+mqtt:
+  host: mosquitto
+  port: 1883
+  user: frigate
+  password: '{FRIGATE_MQTT_PASSWORD}'
+
+detectors:
+  cpu:
+    type: cpu   # ponytail: détecteur CPU (lent), passer à un Coral / OpenVINO si la charge est trop forte
+
+cameras:
+  camera_jardin:
+    ffmpeg:
+      inputs:
+        - path: rtsp://go2rtc:8554/camera_jardin_sd
+          input_args: preset-rtsp-restream
+          roles: [detect]
+        - path: rtsp://go2rtc:8554/camera_jardin
+          input_args: preset-rtsp-restream
+          roles: [record]
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    objects:
+      track: [person, cat, dog, bird]
+
+record:
+  enabled: true
+  alerts:
+    retain:
+      days: 14
+  detections:
+    retain:
+      days: 14
+
+  continuous:
+    days: 0
+  motion:
+    days: 3
+snapshots:
+  enabled: true
+  retain:
+    default: 14
+
+version: 0.18-0

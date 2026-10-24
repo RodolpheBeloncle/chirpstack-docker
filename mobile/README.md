@@ -12,7 +12,7 @@ cp src/config.example.ts src/config.ts   # gitignoré
 ```
 - `HA_URL` : IP LAN du Mac (`ipconfig getifaddr en0`), port 8123. Le téléphone doit être sur le même Wi-Fi.
 - `HA_TOKEN` : HA → Profil → Sécurité → Jetons d'accès longue durée.
-- `SENSORS` / `VALVE` : entity_id HA.
+- `SENSORS` / `VALVE` / `CAMERA` : entity_id HA (vidéo HLS demandée à HA en WebSocket, repli snapshot 1×/s).
 
 Le token est embarqué dans l'APK : acceptable en sideload perso, pas pour distribuer.
 

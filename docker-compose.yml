@@ -84,6 +84,7 @@ services:
       - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
       - MOSQUITTO_N8N_PASSWORD=${MOSQUITTO_N8N_PASSWORD}
       - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
+      - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
     entrypoint: /bin/sh
     user: root
     command:
@@ -93,6 +94,7 @@ services:
         mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd n8n "$$MOSQUITTO_N8N_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd frigate "$$MOSQUITTO_FRIGATE_PASSWORD"
         chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
         chmod 600 /mosquitto/auth/passwd
         exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
@@ -114,7 +116,37 @@ services:
     depends_on:
       - mosquitto
 
+  go2rtc:
+    image: alexxit/go2rtc:1.9.9
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1984:1984"   # UI/API go2rtc, local uniquement
+      - "8555:8555"             # WebRTC
+    volumes:
+      - ./configuration/go2rtc:/config
+
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    restart: unless-stopped
+    shm_size: "256mb"
+    ports:
+      - "127.0.0.1:8971:8971"   # UI Frigate (authentifiée), local uniquement
+    environment:
+      - TZ=Europe/Paris
+      - FRIGATE_MQTT_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
+    volumes:
+      - ./configuration/frigate:/config
+      - frigatemedia:/media/frigate
+      - type: tmpfs
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    depends_on:
+      - go2rtc
+      - mosquitto
+
 volumes:
+  frigatemedia:
   postgresqldata:
   redisdata:
   mosquittoauth:

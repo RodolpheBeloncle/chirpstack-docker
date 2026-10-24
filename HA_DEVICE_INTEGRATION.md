@@ -1,0 +1,62 @@
+# Intégrer un appareil LoRaWAN dans Home Assistant (et l'app Jardin)
+
+Chaîne : appareil → gateway → ChirpStack (décode via codec) → MQTT (Mosquitto) → Home Assistant → app mobile.
+Pas d'intégration HA dédiée ChirpStack ici (chirp2mqtt = add-on HA OS uniquement, HACS cassé) :
+on déclare les entités en YAML, c'est court et versionné.
+
+## 1. ChirpStack
+
+1. **Device profile** : région EU868, LoRaWAN 1.0.3, OTAA, Class A (C si appareil alimenté).
+   Onglet *Codec* → JavaScript → coller le décodeur du fabricant
+   (Dragino : github.com/dragino/dragino-end-node-decoder).
+2. **Application → Add device** : DevEUI + AppKey (étiquette/fiche de l'appareil).
+3. Allumer l'appareil, vérifier le *Join* puis un uplink dans l'onglet *Events*.
+   Le champ `object` de l'uplink = valeurs décodées → noter les noms des champs.
+
+L'`APP_ID` (UUID de l'application) est dans l'URL ChirpStack : `/applications/<APP_ID>`.
+
+## 2. Home Assistant — capteurs (uplink)
+
+Topic publié par ChirpStack : `application/<APP_ID>/device/<DEV_EUI>/event/up` (DevEUI en minuscules).
+
+Dans `configuration/homeassistant/configuration.yaml`, section `mqtt: sensor:` :
+
+```yaml
+    - name: "Sol humidité"                 # → entity_id sensor.sol_humidite
+      unique_id: sol_humidite              # permet d'éditer l'entité dans l'UI
+      state_topic: "application/<APP_ID>/device/<DEV_EUI>/event/up"
+      value_template: "{{ value_json.object.<champ_du_codec> }}"
+      unit_of_measurement: "%"
+      device_class: moisture               # icône + graphes adaptés
+```
+
+Méta utiles hors `object` : `value_json.rxInfo[0].rssi`, `value_json.rxInfo[0].snr`, `value_json.fCnt`.
+
+## 3. Home Assistant — actionneur (downlink)
+
+Topic : `application/<APP_ID>/device/<DEV_EUI>/command/down`, payload JSON :
+
+```json
+{"devEui":"<DEV_EUI>","confirmed":true,"fPort":<port>,"data":"<commande en base64>"}
+```
+
+Commande hex du manuel fabricant → base64 : `echo 0101 | xxd -r -p | base64`.
+Déclarer un `mqtt: switch:` (voir `Vanne jardin`). Avec un vrai retour d'état, remplacer
+`optimistic: true` par `state_topic` (event/up) + `value_template` + `state_on`/`state_off`.
+
+Class A : la commande n'est livrée qu'après le prochain uplink de l'appareil.
+
+## 4. Appliquer
+
+```bash
+docker compose exec homeassistant python -m homeassistant --script check_config -c /config
+docker compose restart homeassistant
+```
+
+Tester sans matériel : publier un faux uplink (cf `scripts/simulate-uplink.sh`).
+
+## 5. Dashboard et app
+
+- Dashboard **Jardin** : `configuration/homeassistant/dashboards/jardin.yaml` (mode YAML, versionné).
+  Ajouter une carte `tile` / `gauge` / `history-graph` avec le nouvel `entity_id`. Rafraîchir la page suffit (pas de restart).
+- App mobile : ajouter l'`entity_id` dans `SENSORS` de `mobile/src/config.ts` (et `config.example.ts`), rebuild.

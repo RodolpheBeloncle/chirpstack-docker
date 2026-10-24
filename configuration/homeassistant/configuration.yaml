@@ -50,3 +50,20 @@ mqtt:
       payload_on: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AQ=="}'
       payload_off: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AA=="}'
       optimistic: true
+
+# Dashboard "Jardin" versionné en YAML (configuration/homeassistant/dashboards/jardin.yaml)
+lovelace:
+  dashboards:
+    dashboard-jardin:
+      mode: yaml
+      filename: dashboards/jardin.yaml
+      title: Jardin
+      icon: mdi:sprout
+      show_in_sidebar: true
+
+# Reverse proxy Traefik (Coolify) : HA 2026 ignore la section YAML `http:` (migrée dans .storage/http).
+# Sur le serveur, .storage/http contient use_x_forwarded_for: true + trusted_proxies: [10.0.1.0/24].
+
+# go2rtc externe (service docker-compose) à la place du go2rtc intégré
+go2rtc:
+  url: http://go2rtc:1984

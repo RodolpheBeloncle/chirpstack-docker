@@ -22,7 +22,22 @@ Contraintes exprimées :
 | Home Assistant | conteneur `homeassistant`, intégration MQTT configurée | http://localhost:8123 (user `rodolphe_beloncle`) |
 | Capteurs démo | `configuration/homeassistant/configuration.yaml` (section `mqtt:`) | topics `application/demo/device/a840410000000001/...` |
 | Simulateur | `scripts/simulate-uplink.sh [intervalle_s]` publie de faux uplinks ChirpStack | — |
-| App Android | `mobile/` (React Native CLI 0.85.2) | voir `mobile/README.md` |
+| App Android | `mobile/` (React Native CLI 0.85.2), vidéo HLS via WebSocket HA `camera/stream` + `react-native-video` (repli snapshot `entity_picture`) | voir `mobile/README.md` |
+| Dashboard HA "Jardin" | `configuration/homeassistant/dashboards/jardin.yaml` (YAML) | http://localhost:8123/dashboard-jardin |
+| Caméra Teruhal TC55 (Eseecloud) | `192.168.1.16`, RTSP `live/ch00_0` (HEVC 1080p) **sans auth** → service `go2rtc` → HA `camera.jardin` | go2rtc UI http://127.0.0.1:1984 |
+| Frigate (NVR, détection CPU, MQTT user `frigate`) | `configuration/frigate/config.yml`, lit les flux via go2rtc, enreg. motion 3 j / alertes 14 j | https://127.0.0.1:8971 (user `admin`, mdp généré au 1er lancement, à changer) |
+
+### Déploiement serveur (Coolify, 31.70.69.194)
+
+- Repo rsync dans `/opt/jardin` (sans .git/mobile), lancé par
+  `docker compose -f docker-compose.yml -f docker-compose.coolify.yml up -d`. Aucun port publié.
+- HA public : https://jardin.triggerstudio.dev (labels Traefik dans `docker-compose.coolify.yml`).
+- WireGuard : serveur `10.77.0.1` (`/etc/wireguard/wg0.conf`, route 192.168.1.16 via le pair maison) ;
+  maison `10.77.0.2` = conteneur `wireguard` (`docker-compose.home.yml`, projet `jardin-home`, conf gitignorée).
+  Plus tard : le Pi remplace le Mac comme pair maison. Stack locale du Mac arrêtée.
+
+Ajouter un appareil : suivre `HA_DEVICE_INTEGRATION.md`.
+Sécuriser la caméra (pas de cloud) : `CAMERA_SECURITY.md`. Agent DVR désinstallé (remplacé par Frigate).
 
 Matériel : **aucun capteur reçu**. Sonde choisie : Dragino **SE01-LS** (solaire).
 Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
@@ -35,6 +50,17 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Champs du codec Dragino (`water_SOIL`, `temp_SOIL`, `conduct_SOIL`, `BatV`) = **supposés**, à vérifier sur une vraie trame.
 - Switch vanne en `optimistic: true` avec payload factice (`AQ==`/`AA==`) : remplacer par la vraie commande Dragino + `state_topic`.
 - Vanne LoRaWAN Class A : downlink livré seulement après un uplink (latence = intervalle d'envoi).
+- Caméra : le go2rtc intégré à HA wrappe les flux en `ffmpeg:` → échec (exit 183) sur la TC55. Solution : service
+  `go2rtc` dédié (`configuration/go2rtc/go2rtc.yaml`, source RTSP native) + `go2rtc: url:` dans HA ;
+  caméra HA "Generic" = `rtsp://go2rtc:8554/camera_jardin` + snapshot `http://go2rtc:1984/api/frame.jpeg?src=camera_jardin`.
+- Caméra : RTSP ouvert sans mot de passe + cloud Eseecloud par défaut → bloquer son accès Internet (Livebox),
+  fixer son IP en DHCP statique (sinon `go2rtc.yaml` casse). Lecture live HEVC dans le navigateur : OK Safari, variable sur Chrome.
+- Frigate : `detect: enabled: true` obligatoire (sinon detect/state OFF). Intégration Frigate dans HA = composant custom (HACS cassé → install manuelle si besoin).
+- **HA 2026 : section YAML `http:` ignorée** (`yaml_migration_done` dans `.storage/http`). Reverse proxy = éditer
+  `.storage/http` (HA arrêté) : `use_x_forwarded_for: true`, `trusted_proxies: ["10.0.1.0/24"]` (réseau `coolify`).
+- Serveur : certs Mosquitto copiés depuis le Mac (uid 501) → `chown -R 1883:1883 configuration/mosquitto/certs`.
+- Tunnel WireGuard sur **UDP 4500** (autorisé par défaut par la Livebox, IPSEC-NAT-T) + règle entrante UDP 4500 dans le pare-feu de l'hébergeur. Clamp MSS (TCPMSS) obligatoire des deux côtés, sinon RTSP en timeout.
+- Let's Encrypt : 5 échecs/h max par domaine (DNS absent = échec) → ne lancer Traefik qu'après propagation DNS.
 - Mosquitto sans ACL : tous les users voient tous les topics. À corriger avant exposition.
 
 ## Prochaines étapes (ordre)
