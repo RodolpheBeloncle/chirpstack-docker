@@ -1,6 +1,7 @@
 # hidden files, exluding gitattributes
 .*
 !.gitattributes
+!mobile/.gitignore
 
 # data folder
 /data
@@ -9,3 +10,5 @@
 # secrets & deployment-specific certs (LE certs rotate every 90d)
 configuration/mosquitto/certs/
 
+configuration/homeassistant/*
+!configuration/homeassistant/configuration.yaml

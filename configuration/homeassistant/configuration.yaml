@@ -1,0 +1,52 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# Demo MVP : topics ChirpStack simulés par scripts/simulate-uplink.sh
+# A remplacer par le vrai APP_ID / DEV_EUI quand la SE01-LS sera enregistrée
+mqtt:
+  sensor:
+    - name: "Sol humidité"
+      unique_id: demo_sol_humidite
+      state_topic: "application/demo/device/a840410000000001/event/up"
+      value_template: "{{ value_json.object.water_SOIL }}"
+      unit_of_measurement: "%"
+      device_class: moisture
+    - name: "Sol température"
+      unique_id: demo_sol_temperature
+      state_topic: "application/demo/device/a840410000000001/event/up"
+      value_template: "{{ value_json.object.temp_SOIL }}"
+      unit_of_measurement: "°C"
+      device_class: temperature
+    - name: "Sol conductivité"
+      unique_id: demo_sol_ec
+      state_topic: "application/demo/device/a840410000000001/event/up"
+      value_template: "{{ value_json.object.conduct_SOIL }}"
+      unit_of_measurement: "µS/cm"
+    - name: "Sonde batterie"
+      unique_id: demo_sonde_batterie
+      state_topic: "application/demo/device/a840410000000001/event/up"
+      value_template: "{{ value_json.object.BatV }}"
+      unit_of_measurement: "V"
+      device_class: voltage
+    - name: "Sonde signal (SNR)"
+      unique_id: demo_sonde_snr
+      state_topic: "application/demo/device/a840410000000001/event/up"
+      value_template: "{{ value_json.rxInfo[0].snr }}"
+      unit_of_measurement: "dB"
+  switch:
+    # ponytail: optimistic (pas de retour d'état), payload vanne factice ; mettre la vraie commande Dragino + state_topic quand la vanne existera
+    - name: "Vanne jardin"
+      unique_id: demo_vanne_jardin
+      command_topic: "application/demo/device/a840410000000002/command/down"
+      payload_on: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AQ=="}'
+      payload_off: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AA=="}'
+      optimistic: true

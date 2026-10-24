@@ -83,6 +83,7 @@ services:
     environment:
       - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
       - MOSQUITTO_N8N_PASSWORD=${MOSQUITTO_N8N_PASSWORD}
+      - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
     entrypoint: /bin/sh
     user: root
     command:
@@ -91,6 +92,7 @@ services:
         rm -f /mosquitto/auth/passwd
         mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd n8n "$$MOSQUITTO_N8N_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
         chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
         chmod 600 /mosquitto/auth/passwd
         exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
@@ -99,6 +101,18 @@ services:
       - mosquittoauth:/mosquitto/auth/
       - ./configuration/mosquitto/certs/:/mosquitto/certs/
       - mosquittodata:/mosquitto/data/
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    environment:
+      - TZ=Europe/Paris
+    volumes:
+      - ./configuration/homeassistant:/config
+    depends_on:
+      - mosquitto
 
 volumes:
   postgresqldata:
