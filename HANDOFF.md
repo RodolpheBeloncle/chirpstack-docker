@@ -60,6 +60,8 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
   `.storage/http` (HA arrêté) : `use_x_forwarded_for: true`, `trusted_proxies: ["10.0.1.0/24"]` (réseau `coolify`).
 - Serveur : certs Mosquitto copiés depuis le Mac (uid 501) → `chown -R 1883:1883 configuration/mosquitto/certs`.
 - Tunnel WireGuard sur **UDP 4500** (autorisé par défaut par la Livebox, IPSEC-NAT-T) + règle entrante UDP 4500 dans le pare-feu de l'hébergeur. Clamp MSS (TCPMSS) obligatoire des deux côtés, sinon RTSP en timeout.
+- Tunnel durci : PresharedKey (serveur `/etc/wireguard/home.psk`) ; côté maison seul `wg0 → 192.168.1.16:554` est forwardé (reste DROP) ;
+  côté serveur rien n'entre depuis wg0 (INPUT/DOCKER-USER DROP hors réponses). Gateway LoRa plus tard = ouvrir explicitement son flux (UDP 1700 ou MQTT).
 - Let's Encrypt : 5 échecs/h max par domaine (DNS absent = échec) → ne lancer Traefik qu'après propagation DNS.
 - Mosquitto sans ACL : tous les users voient tous les topics. À corriger avant exposition.
 
