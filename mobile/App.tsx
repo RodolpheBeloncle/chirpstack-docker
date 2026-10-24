@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  NativeModules,
+  PermissionsAndroid,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -77,6 +79,13 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Notifications : service Android natif (NotifyService.kt) abonné à l'événement HA `jardin_notify`
+  useEffect(() => {
+    PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS').then(
+      () => NativeModules.Notify.start(HA_URL, HA_TOKEN),
+    );
   }, []);
 
   useEffect(() => {

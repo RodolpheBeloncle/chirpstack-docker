@@ -85,4 +85,6 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 3. **Vanne** : vraie commande downlink + retour d'état.
 4. **Déploiement sécurisé via Coolify** (demandé par l'utilisateur) : ACL Mosquitto, HA derrière HTTPS
    (ou accès VPN WireGuard/Tailscale), passer l'URL de l'app en HTTPS, keystore release.
-5. Notifications sans Firebase : app HA "minimal" (F-Droid) ou ntfy, configurées dans HA.
+5. Notifications : **dans l'app** (pas de Firebase) — `NotifyService.kt` (service de premier plan, WebSocket HA, événement
+   `jardin_notify` {title, message}) ; alertes dans `configuration/homeassistant/automations_jardin.yaml`.
+   À tester sur le téléphone ; exclure l'app de l'optimisation batterie sinon Android coupe le service.
