@@ -74,7 +74,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
   côté serveur rien n'entre depuis wg0 (INPUT/DOCKER-USER DROP hors réponses). Gateway LoRa plus tard = ouvrir explicitement son flux (UDP 1700 ou MQTT).
 - Let's Encrypt : 5 échecs/h max par domaine (DNS absent = échec) → ne lancer Traefik qu'après propagation DNS.
 - Pi : `iptables` absent par défaut sur bookworm → `apt install iptables` avant wg-quick. Config serveur LoRa dans `local_conf.json` (pas `global_conf.json`).
-- Mosquitto sans ACL : tous les users voient tous les topics. À corriger avant exposition.
+- Mosquitto : ACL `configuration/mosquitto/config/acl` (chirpstack, homeassistant, frigate). Nouveau compte = l'y ajouter, sinon il ne voit rien.
 
 ## Prochaines étapes (ordre)
 

@@ -1,0 +1,13 @@
+# Chaque compte ne voit que ses topics (anonyme interdit dans mosquitto.conf)
+user chirpstack
+topic readwrite eu868/gateway/#
+topic readwrite application/#
+
+user homeassistant
+# readwrite : downlinks (command/down) + simulateur de démo
+topic readwrite application/#
+topic readwrite homeassistant/#
+topic read frigate/#
+
+user frigate
+topic readwrite frigate/#
