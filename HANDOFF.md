@@ -96,7 +96,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Vidéo : HLS avec tampon live ~2 s, réouverture au retour au premier plan/erreur. Latence plus basse = WebRTC (non fait).
 - Caméra TC55 : pas d'ONVIF ; PTZ éventuel via l'API hi3510 (identifiants admin requis, à tester si motorisée).
 - Espaces de l'app = **pièces (areas) HA** (Maison : caméra ; Jardin : sonde, vanne). Registres + états resynchronisés toutes les 10 s.
-- App renommée **Sphère**, logo source `mobile/assets/logo.png` (icônes = recadrage carré via `sips`).
+- App renommée **Verdia**, logo source `mobile/assets/logo.png` (icônes = recadrage carré via `sips`).
 - Domaine HA : `homeassistant.triggerstudio.dev` (+ `jardin.` gardé en transition). Clé API Coolify actuelle = lecture seule.
 - Sauvegarde : service `backup` + tâche planifiée Coolify `0 3 1 * *` → `/opt/backups/jardin.tar.gz` (écrasé chaque mois ;
   contient configuration/, mosquitto, dump ChirpStack ; pas les enregistrements Frigate). Copie hors VPS à prévoir.
