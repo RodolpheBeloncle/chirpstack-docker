@@ -211,10 +211,10 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=coolify
-      - traefik.http.routers.jardin.rule=Host(`jardin.triggerstudio.dev`)
+      - traefik.http.routers.jardin.rule=Host(`homeassistant.triggerstudio.dev`) || Host(`jardin.triggerstudio.dev`)
       - traefik.http.routers.jardin.entrypoints=https
       - traefik.http.routers.jardin.tls.certresolver=letsencrypt
-      - traefik.http.routers.jardin-http.rule=Host(`jardin.triggerstudio.dev`)
+      - traefik.http.routers.jardin-http.rule=Host(`homeassistant.triggerstudio.dev`) || Host(`jardin.triggerstudio.dev`)
       - traefik.http.routers.jardin-http.entrypoints=http
       - traefik.http.routers.jardin-http.middlewares=jardin-https
       - traefik.http.middlewares.jardin-https.redirectscheme.scheme=https
@@ -275,6 +275,25 @@ services:
         target: /mosquitto/data
         type: volume
         volume: {}
+  backup:
+    # Conteneur outil : la tâche planifiée Coolify (1er du mois) y exécute la sauvegarde, écrasant la précédente
+    image: postgres:14-alpine
+    command: ["sleep", "infinity"]
+    environment:
+      - PGPASSWORD=chirpstack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres -U chirpstack || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      default: null
+    restart: unless-stopped
+    volumes:
+      - /opt/jardin/configuration:/config:ro
+      - mosquittodata:/mosquitto:ro
+      - /opt/backups:/backups
   postgres:
     environment:
       - POSTGRES_USER=chirpstack
