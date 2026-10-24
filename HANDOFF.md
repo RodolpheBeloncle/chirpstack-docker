@@ -34,7 +34,9 @@ Contraintes exprimées :
   `docker compose -f docker-compose.yml -f docker-compose.coolify.yml config --no-interpolate` puis volumes `external`),
   à coller dans l'UI Coolify. Secrets = variables d'env Coolify. Données en place : `/opt/jardin/configuration/*`
   (bind mounts absolus) + volumes `jardin_*` (external). **Ne jamais relancer `docker compose up` dans /opt/jardin.**
-- HA public : https://jardin.triggerstudio.dev (labels Traefik dans `docker-compose.coolify.yml`).
+- HA public : https://jardin.triggerstudio.dev ; ChirpStack public : https://chirpstack.triggerstudio.dev (mdp admin changé).
+- Healthchecks sur tous les services (visibles dans Coolify). ChirpStack : tester `127.0.0.1`, pas `localhost` (IPv6 → refus).
+  Gateway-bridge : healthcheck via métriques Prometheus `:9100`.
 - WireGuard : serveur `10.77.0.1` (`/etc/wireguard/wg0.conf`, route 192.168.1.16 via le pair maison) ;
   maison `10.77.0.2` = **Raspberry Pi** (WireGuard natif `/etc/wireguard/wg0.conf`, `wg-quick@wg0` activé, mêmes clés
   que l'ancien conteneur Mac `docker-compose.home.yml`, désormais arrêté). Stack locale du Mac arrêtée.
@@ -75,8 +77,6 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Mosquitto sans ACL : tous les users voient tous les topics. À corriger avant exposition.
 
 ## Prochaines étapes (ordre)
-
-0. **Créer la gateway `a84041fdfea3a5c3` dans ChirpStack** (http://10.77.0.1:8081 via VPN), sinon ses trames sont ignorées.
 
 1. **Tester l'app** sur le téléphone avec la démo (simulateur lancé, token HA dans `mobile/src/config.ts`).
 2. **Quand la SE01-LS arrive** : l'enregistrer dans ChirpStack (EU868, OTAA, codec Dragino

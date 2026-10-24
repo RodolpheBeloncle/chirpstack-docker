@@ -1,6 +1,12 @@
 services:
   chirpstack:
     image: chirpstack/chirpstack:4
+    healthcheck:
+      test: ["CMD-SHELL","wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     command: -c /etc/chirpstack
     restart: unless-stopped
     volumes:
@@ -20,6 +26,12 @@ services:
 
   chirpstack-gateway-bridge:
     image: chirpstack/chirpstack-gateway-bridge:4
+    healthcheck:
+      test: ["CMD-SHELL","wget -q -O /dev/null http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     ports:
       - "1700:1700/udp"
@@ -31,11 +43,19 @@ services:
       - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/command/#
       - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
       - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+      - METRICS__PROMETHEUS__ENDPOINT_ENABLED=true
+      - METRICS__PROMETHEUS__BIND=0.0.0.0:9100
     depends_on:
       - mosquitto
 
   chirpstack-gateway-bridge-basicstation:
     image: chirpstack/chirpstack-gateway-bridge:4
+    healthcheck:
+      test: ["CMD-SHELL","nc -z localhost 3001 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     command: -c /etc/chirpstack-gateway-bridge/chirpstack-gateway-bridge-basicstation-eu868.toml
     ports:
@@ -50,6 +70,12 @@ services:
 
   chirpstack-rest-api:
     image: chirpstack/chirpstack-rest-api:4
+    healthcheck:
+      test: ["CMD-SHELL","nc -z localhost 8090 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     command: --server chirpstack:8080 --bind 0.0.0.0:8090 --insecure
     ports:
@@ -59,6 +85,12 @@ services:
 
   postgres:
     image: postgres:14-alpine
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U chirpstack || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     volumes:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
@@ -70,6 +102,12 @@ services:
 
   redis:
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD-SHELL","redis-cli ping | grep -q PONG || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     command: redis-server --save 300 1 --save 60 100 --appendonly no
     volumes:
@@ -77,6 +115,12 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2
+    healthcheck:
+      test: ["CMD-SHELL","nc -z localhost 1883 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     ports:
       - "8883:8883"
@@ -104,6 +148,12 @@ services:
 
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS -o /dev/null http://localhost:8123/manifest.json || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     ports:
       - "8123:8123"
@@ -116,6 +166,12 @@ services:
 
   go2rtc:
     image: alexxit/go2rtc:1.9.9
+    healthcheck:
+      test: ["CMD-SHELL","wget -q -O /dev/null http://localhost:1984/api || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     restart: unless-stopped
     ports:
       - "127.0.0.1:1984:1984"   # UI/API go2rtc, local uniquement

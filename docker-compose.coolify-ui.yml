@@ -27,7 +27,24 @@ services:
       - MQTT_USERNAME=chirpstack
       - MQTT_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
     image: chirpstack/chirpstack:4
+    healthcheck:
+      test: ["CMD-SHELL","wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.chirpstack.rule=Host(`chirpstack.triggerstudio.dev`)
+      - traefik.http.routers.chirpstack.entrypoints=https
+      - traefik.http.routers.chirpstack.tls.certresolver=letsencrypt
+      - traefik.http.routers.chirpstack-http.rule=Host(`chirpstack.triggerstudio.dev`)
+      - traefik.http.routers.chirpstack-http.entrypoints=http
+      - traefik.http.routers.chirpstack-http.middlewares=jardin-https
+      - traefik.http.services.chirpstack.loadbalancer.server.port=8080
     networks:
+      coolify: null
       default: null
     ports:
       - host_ip: 10.77.0.1
@@ -53,7 +70,15 @@ services:
       - INTEGRATION__MQTT__COMMAND_TOPIC_TEMPLATE=eu868/gateway/{{ .GatewayID }}/command/#
       - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
       - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
+      - METRICS__PROMETHEUS__ENDPOINT_ENABLED=true
+      - METRICS__PROMETHEUS__BIND=0.0.0.0:9100
     image: chirpstack/chirpstack-gateway-bridge:4
+    healthcheck:
+      test: ["CMD-SHELL","wget -q -O /dev/null http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     ports:
@@ -79,6 +104,12 @@ services:
       - INTEGRATION__MQTT__AUTH__GENERIC__USERNAME=chirpstack
       - INTEGRATION__MQTT__AUTH__GENERIC__PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
     image: chirpstack/chirpstack-gateway-bridge:4
+    healthcheck:
+      test: ["CMD-SHELL","nc -z localhost 3001 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     restart: unless-stopped
@@ -95,6 +126,12 @@ services:
         condition: service_started
         required: true
     image: chirpstack/chirpstack-rest-api:4
+    healthcheck:
+      test: ["CMD-SHELL","nc -z localhost 8090 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     restart: unless-stopped
@@ -136,6 +173,12 @@ services:
         type: tmpfs
   go2rtc:
     image: alexxit/go2rtc:1.9.9
+    healthcheck:
+      test: ["CMD-SHELL","wget -q -O /dev/null http://localhost:1984/api || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     ports:
@@ -159,6 +202,12 @@ services:
     environment:
       - TZ=Europe/Paris
     image: ghcr.io/home-assistant/home-assistant:stable
+    healthcheck:
+      test: ["CMD-SHELL","curl -fsS -o /dev/null http://localhost:8123/manifest.json || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     labels:
       - traefik.enable=true
       - traefik.docker.network=coolify
@@ -197,6 +246,12 @@ services:
       - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
       - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
     image: eclipse-mosquitto:2
+    healthcheck:
+      test: ["CMD-SHELL","nc -z localhost 1883 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     restart: unless-stopped
@@ -226,6 +281,12 @@ services:
       - POSTGRES_PASSWORD=chirpstack
       - POSTGRES_DB=chirpstack
     image: postgres:14-alpine
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U chirpstack || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     restart: unless-stopped
@@ -242,6 +303,12 @@ services:
   redis:
     command: redis-server --save 300 1 --save 60 100 --appendonly no
     image: redis:7-alpine
+    healthcheck:
+      test: ["CMD-SHELL","redis-cli ping | grep -q PONG || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       default: null
     restart: unless-stopped
