@@ -9,7 +9,8 @@
   action:
     - event: jardin_notify
       event_data:
-        title: "Sol sec"
+        # Espace (pièce HA) de l'appareil : suit les déplacements faits dans l'app
+        title: "Sol sec ({{ area_name('sensor.sol_humidite') or 'jardin' }})"
         message: "Humidité du sol à {{ states('sensor.sol_humidite') }} %"
 
 - id: jardin_notif_personne
@@ -22,5 +23,5 @@
   action:
     - event: jardin_notify
       event_data:
-        title: "Personne au jardin"
+        title: "Personne détectée ({{ area_name('camera.jardin_sd') or 'caméra' }})"
         message: "Détection caméra à {{ now().strftime('%H:%M') }}"
