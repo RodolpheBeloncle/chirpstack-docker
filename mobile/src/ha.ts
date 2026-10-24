@@ -1,4 +1,32 @@
-import { HA_TOKEN, HA_URL } from './config';
+import { HA_URL } from './config';
+
+// Jeton de l'utilisateur connecté (longue durée, créé après le login HA/Google)
+let HA_TOKEN = '';
+export const setToken = (t: string) => (HA_TOKEN = t);
+
+// Connexion OAuth Home Assistant ; client_id = page servie par HA qui déclare la redirection iotrigger://auth
+export const CLIENT_ID = `${HA_URL}/local/iotrigger.html`;
+export const REDIRECT = 'iotrigger://auth';
+export const loginUrl = () =>
+  `${HA_URL}/auth/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT)}`;
+
+// Code d'autorisation → jeton court → jeton longue durée (même rôle que l'utilisateur)
+export async function exchange(code: string) {
+  const res = await fetch(`${HA_URL}/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&client_id=${encodeURIComponent(CLIENT_ID)}`,
+  });
+  if (!res.ok) throw new Error(`Connexion refusée (HTTP ${res.status})`);
+  setToken((await res.json()).access_token);
+  return ws<string>('auth/long_lived_access_token', {
+    client_name: `IoTrigger ${new Date().toISOString()}`,
+    lifespan: 3650,
+  });
+}
+
+export const currentUser = () =>
+  ws<{ name: string; is_admin: boolean }>('auth/current_user');
 
 export type EntityState = {
   entity_id: string;

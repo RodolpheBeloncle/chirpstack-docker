@@ -6,6 +6,7 @@ import android.content.Intent
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactMethod
 
 // JS : NativeModules.Notify.start(HA_URL, HA_TOKEN) → mémorise la config et lance NotifyService
@@ -17,6 +18,17 @@ class NotifyModule(private val ctx: ReactApplicationContext) : ReactContextBaseJ
     ctx.getSharedPreferences(NotifyService.PREFS, Context.MODE_PRIVATE).edit()
         .putString("url", url).putString("token", token).apply()
     NotifyService.start(ctx)
+  }
+
+  // Jeton mémorisé (null = pas connecté)
+  @ReactMethod
+  fun token(p: Promise) =
+      p.resolve(ctx.getSharedPreferences(NotifyService.PREFS, Context.MODE_PRIVATE).getString("token", null))
+
+  @ReactMethod
+  fun logout() {
+    ctx.getSharedPreferences(NotifyService.PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+    ctx.stopService(Intent(ctx, NotifyService::class.java))
   }
 }
 

@@ -81,3 +81,17 @@ lovelace:
 # go2rtc externe (service docker-compose) à la place du go2rtc intégré
 go2rtc:
   url: http://go2rtc:1984
+
+# Connexion Google (composant custom cavefire/hass-openid 1.4.0, custom_components/openid)
+# create_user: false → seuls les comptes HA existants (username = e-mail Google) peuvent se connecter
+openid:
+  client_id: !secret google_client_id
+  client_secret: !secret google_client_secret
+  configure_url: "https://accounts.google.com/.well-known/openid-configuration"
+  validate_tls: true
+  username_field: "email"
+  scope: "openid profile email"
+  block_login: false
+  create_user: false
+  use_pkce: true
+  openid_text: "Se connecter avec Google"

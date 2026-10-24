@@ -103,11 +103,17 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Notifs : canal `alerts_v2` (vibration, visible écran verrouillé). La notif « Surveillance active » (service de premier plan)
   n'est pas balayable sous Android 12 → la masquer via Paramètres notification > canal « Service ».
 
-## Prochaine session : rôles admin / viewer + SSO Google
+## Connexion Google + rôles (2026-10-24, fait)
 
-Demande : l'utilisateur = admin, sa compagne = viewer (lecture seule, accès restreint), connexion via SSO Google.
-Pistes : utilisateurs HA non-admin + un token par utilisateur (au lieu du token admin unique dans `config.ts`) ;
-SSO Google = OIDC devant HA (pas natif : proxy type Authelia/authentik, ou composant custom `hass-openid`).
-Les registres HA (`config/*`) exigent admin → l'app doit masquer ＋/espaces/retrait pour un viewer. À cadrer avec `/architect`.
+- HA : composant custom `hass-openid` 1.4.0 (`custom_components/openid`, serveur seulement), bloc `openid:` dans
+  `configuration.yaml` (secrets `google_client_id/secret` dans `secrets.yaml` serveur). `create_user: false` :
+  correspondance par **nom** d'utilisateur HA = e-mail Google. Admin `rbeloncle@gmail.com` (owner), viewer
+  `lea.trianneau@yahoo.fr` (`system-users`). Client Google « Application Web », callback `/auth/openid/callback`.
+- App : écran « Se connecter » → `/auth/authorize` HA (bouton Google) → `iotrigger://auth?code=` → `/auth/token`
+  → jeton longue durée créé (`auth/long_lived_access_token`) et stocké en SharedPreferences (`NotifyModule.token/logout`).
+  client_id = `https://homeassistant.triggerstudio.dev/local/iotrigger.html` (serveur `www/`, `<link rel=redirect_uri>`).
+- Viewer = lecture seule **côté app uniquement** (HA n'a pas de permissions par utilisateur : via le web HA elle peut agir).
+  Non vérifié : registres `config/*/list` accessibles à un non-admin.
+- Reste : installer l'app sur le téléphone de la viewer (adb) et tester sa connexion.
 - Domaines HTTPS = **onglet Domains Coolify** (API : `PATCH /services/<uuid>` champ `urls` [{name, url avec :port}]), plus de labels Traefik.
   Ressource renommée « IOT STACK » (projet « Projet Iot ») par l'utilisateur.

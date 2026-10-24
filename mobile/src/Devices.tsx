@@ -57,12 +57,14 @@ export function DeviceCard({
   width,
   onOpen,
   onChange,
+  readOnly,
 }: {
   device: Device;
   states: States;
   width: number;
   onOpen: () => void;
   onChange: () => void;
+  readOnly: boolean;
 }) {
   const toggle = device.entities.find(e => TOGGLE.includes(domain(e)));
   const on = isOn(states[toggle ?? '']);
@@ -84,7 +86,7 @@ export function DeviceCard({
       ]}
     >
       <Pressable
-        disabled={!toggle}
+        disabled={!toggle || readOnly}
         hitSlop={8}
         onPress={() =>
           toggle &&
@@ -112,11 +114,13 @@ function Control({
   st,
   dev,
   onChange,
+  readOnly,
 }: {
   id: string;
   st?: EntityState;
   dev: Device;
   onChange: () => void;
+  readOnly: boolean;
 }) {
   const call = (service: string, data?: object) =>
     callService(id, service, data).then(onChange);
@@ -124,7 +128,10 @@ function Control({
   const a = st?.attributes ?? {};
   let control;
 
-  if (TOGGLE.includes(d))
+  // Viewer : valeur seule, aucune commande (caméra exceptée)
+  if (readOnly && d !== 'camera')
+    control = <Text style={s.rowValue}>{value(st)}</Text>;
+  else if (TOGGLE.includes(d))
     control = (
       <Switch
         value={st?.state === 'on'}
@@ -205,6 +212,7 @@ export function DeviceSheet({
   onRemove,
   areas,
   onArea,
+  readOnly,
 }: {
   device: Device | null;
   states: States;
@@ -213,6 +221,7 @@ export function DeviceSheet({
   onRemove: (d: Device) => void;
   areas: Area[];
   onArea: (d: Device, areaId: string) => void;
+  readOnly: boolean;
 }) {
   return (
     <Modal
@@ -240,9 +249,12 @@ export function DeviceSheet({
                 st={states[id]}
                 dev={device}
                 onChange={onChange}
+                readOnly={readOnly}
               />
             ))}
           </View>
+          {!readOnly && (
+          <>
           <Text style={s.area}>Espace</Text>
           <View style={s.chips}>
             {areas.map(a => (
@@ -262,6 +274,8 @@ export function DeviceSheet({
           <Pressable onPress={() => onRemove(device)} style={s.remove}>
             <Text style={s.removeTxt}>Retirer de l'app</Text>
           </Pressable>
+          </>
+          )}
         </ScrollView>
       )}
     </Modal>

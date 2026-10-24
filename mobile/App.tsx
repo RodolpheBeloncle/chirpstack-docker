@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   AppState,
+  Linking,
   Image,
   NativeModules,
   PermissionsAndroid,
@@ -16,21 +17,98 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HA_TOKEN, HA_URL, CAMERA } from './src/config';
+import { HA_URL, CAMERA } from './src/config';
 import {
   Area,
   createArea,
+  currentUser,
   Device,
   EntityState,
+  exchange,
   ha,
   hlsUrl,
   loadDevices,
+  loginUrl,
   setArea,
   setInApp,
+  setToken,
 } from './src/ha';
 import { AddSheet, C, DeviceCard, DeviceSheet } from './src/Devices';
 
+// Connexion : page HA (bouton Google) → iotrigger://auth?code=… → jeton longue durée mémorisé côté natif
 function App() {
+  const [token, setTok] = useState<string | null | undefined>();
+  const [admin, setAdmin] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const use = useCallback(async (t: string | null) => {
+    if (t) {
+      setToken(t);
+      try {
+        setAdmin((await currentUser()).is_admin);
+      } catch {
+        NativeModules.Notify.logout(); // jeton révoqué
+        t = null;
+      }
+    }
+    setTok(t);
+  }, []);
+
+  useEffect(() => {
+    NativeModules.Notify.token().then(use);
+    const onUrl = async ({ url }: { url: string }) => {
+      const code = url.match(/[?&]code=([^&]+)/)?.[1];
+      if (!url.startsWith('iotrigger://auth') || !code) return;
+      try {
+        const t = await exchange(decodeURIComponent(code));
+        NativeModules.Notify.start(HA_URL, t);
+        use(t);
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    };
+    Linking.getInitialURL().then(url => {
+      if (url) onUrl({ url });
+    });
+    const sub = Linking.addEventListener('url', onUrl);
+    return () => sub.remove();
+  }, [use]);
+
+  if (token === undefined) return null;
+  if (token === null)
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={[s.root, s.login]}>
+          <Image source={require('./assets/logo.png')} style={s.logo} />
+          <Text style={s.title}>IoTrigger</Text>
+          {error && <Text style={s.error}>{error}</Text>}
+          <Pressable style={s.loginBtn} onPress={() => Linking.openURL(loginUrl())}>
+            <Text style={s.loginTxt}>Se connecter</Text>
+          </Pressable>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
+  return (
+    <Home
+      token={token}
+      admin={admin}
+      onLogout={() => {
+        NativeModules.Notify.logout();
+        setTok(null);
+      }}
+    />
+  );
+}
+
+function Home({
+  token,
+  admin,
+  onLogout,
+}: {
+  token: string;
+  admin: boolean;
+  onLogout: () => void;
+}) {
   const [states, setStates] = useState<Record<string, EntityState>>({});
   const [devices, setDevices] = useState<Device[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -72,9 +150,9 @@ function App() {
   // Notifications : service Android natif (NotifyService.kt) abonné à l'événement HA `jardin_notify`
   useEffect(() => {
     PermissionsAndroid.request('android.permission.POST_NOTIFICATIONS').then(
-      () => NativeModules.Notify.start(HA_URL, HA_TOKEN),
+      () => NativeModules.Notify.start(HA_URL, token),
     );
-  }, []);
+  }, [token]);
 
   const toggle = async (d: Device, inApp: boolean) => {
     try {
@@ -160,12 +238,19 @@ function App() {
             <Text style={s.title}>
               {spaces.find(a => a.area_id === current)?.name ?? 'Accueil'}
             </Text>
-            <Pressable
-              onPress={() => setAdding(true)}
-              style={({ pressed }) => [s.add, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={s.addTxt}>＋</Text>
-            </Pressable>
+            <View style={s.actions}>
+              {admin && (
+                <Pressable
+                  onPress={() => setAdding(true)}
+                  style={({ pressed }) => [s.add, pressed && { opacity: 0.6 }]}
+                >
+                  <Text style={s.addTxt}>＋</Text>
+                </Pressable>
+              )}
+              <Pressable onPress={onLogout} style={s.add}>
+                <Text style={s.addTxt}>⎋</Text>
+              </Pressable>
+            </View>
           </View>
           {error && <Text style={s.error}>{error}</Text>}
 
@@ -181,7 +266,7 @@ function App() {
                 </Text>
               </Pressable>
             ))}
-            {newSpace === null ? (
+            {!admin ? null : newSpace === null ? (
               <Pressable onPress={() => setNewSpace('')} style={s.tab}>
                 <Text style={s.tabTxt}>＋ Espace</Text>
               </Pressable>
@@ -233,7 +318,9 @@ function App() {
 
           <Text style={s.section}>Appareils</Text>
           {mine.length === 0 && !loading && (
-            <Text style={s.hint}>Touchez ＋ pour ajouter un appareil.</Text>
+            <Text style={s.hint}>
+              {admin ? 'Touchez ＋ pour ajouter un appareil.' : 'Aucun appareil partagé.'}
+            </Text>
           )}
           <View style={s.grid}>
             {mine.map(d => (
@@ -244,6 +331,7 @@ function App() {
                 width={cardW}
                 onOpen={() => setOpenId(d.id)}
                 onChange={refresh}
+                readOnly={!admin}
               />
             ))}
           </View>
@@ -255,6 +343,7 @@ function App() {
           onClose={() => setOpenId(null)}
           onChange={refresh}
           onRemove={d => toggle(d, false)}
+          readOnly={!admin}
           areas={areas}
           onArea={(d, id) => {
             setSpace(id);
@@ -304,6 +393,16 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   addTxt: { color: '#007aff', fontSize: 24 },
+  actions: { flexDirection: 'row', gap: 8 },
+  login: { alignItems: 'center', justifyContent: 'center', gap: 24, padding: 32 },
+  logo: { width: 120, height: 120, borderRadius: 28 },
+  loginBtn: {
+    backgroundColor: C.text,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+  },
+  loginTxt: { color: C.card, fontSize: 17, fontWeight: '600' },
   error: {
     color: '#c0392b',
     backgroundColor: '#fdecea',
