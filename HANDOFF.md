@@ -108,7 +108,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - HA : composant custom `hass-openid` 1.4.0 (`custom_components/openid`, serveur seulement), bloc `openid:` dans
   `configuration.yaml` (secrets `google_client_id/secret` dans `secrets.yaml` serveur). `create_user: false` :
   correspondance par **nom** d'utilisateur HA = e-mail Google. Admin `rbeloncle@gmail.com` (owner), viewer
-  `lea.trianneau@yahoo.fr` (`system-users`). Client Google « Application Web », callback `/auth/openid/callback`.
+  `ltrianneau@gmail.com` (`system-users`). Client Google « Application Web », callback `/auth/openid/callback`.
 - App : écran « Se connecter » → `/auth/authorize` HA (bouton Google) → `iotrigger://auth?code=` → `/auth/token`
   → jeton longue durée créé (`auth/long_lived_access_token`) et stocké en SharedPreferences (`NotifyModule.token/logout`).
   client_id = `https://homeassistant.triggerstudio.dev/local/iotrigger.html` (serveur `www/`, `<link rel=redirect_uri>`).
