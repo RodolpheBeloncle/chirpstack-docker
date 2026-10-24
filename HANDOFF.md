@@ -88,3 +88,10 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 5. Notifications : **dans l'app** (pas de Firebase) — `NotifyService.kt` (service de premier plan, WebSocket HA, événement
    `jardin_notify` {title, message}) ; alertes dans `configuration/homeassistant/automations_jardin.yaml`.
    À tester sur le téléphone ; exclure l'app de l'optimisation batterie sinon Android coupe le service.
+
+## App : cards dynamiques (2026-10-24)
+
+- Un appareil HA apparaît dans l'app s'il porte le **libellé `app`** (bouton ＋ dans l'app, ou HA → Appareils → libellés).
+- ESP32 : flasher ESPHome, l'adopter dans HA → il apparaît dans ＋. Contrôles auto par domaine (switch/light, number, select, button, cover, camera).
+- Vidéo : HLS avec tampon live ~2 s, réouverture au retour au premier plan/erreur. Latence plus basse = WebRTC (non fait).
+- Caméra TC55 : pas d'ONVIF ; PTZ éventuel via l'API hi3510 (identifiants admin requis, à tester si motorisée).
