@@ -128,6 +128,16 @@ export async function loadDevices(): Promise<{ devices: Device[]; areas: Area[] 
 export const createArea = (name: string) =>
   ws<Area>('config/area_registry/create', { name });
 
+export const renameDevice = (device: Device, name: string) =>
+  ws('config/device_registry/update', { device_id: device.id, name_by_user: name || null });
+
+export const renameArea = (areaId: string, name: string) =>
+  ws('config/area_registry/update', { area_id: areaId, name });
+
+// Les appareils de l'espace restent dans HA, sans pièce
+export const deleteArea = (areaId: string) =>
+  ws('config/area_registry/delete', { area_id: areaId });
+
 export const setArea = (device: Device, areaId: string) =>
   ws('config/device_registry/update', { device_id: device.id, area_id: areaId });
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
   AppState,
   Linking,
   Image,
@@ -22,6 +23,7 @@ import {
   Area,
   createArea,
   currentUser,
+  deleteArea,
   Device,
   EntityState,
   exchange,
@@ -29,11 +31,13 @@ import {
   hlsUrl,
   loadDevices,
   loginUrl,
+  renameArea,
+  renameDevice,
   setArea,
   setInApp,
   setToken,
 } from './src/ha';
-import { AddSheet, C, DeviceCard, DeviceSheet } from './src/Devices';
+import { AddSheet, C, DeviceCard, DeviceSheet, SpaceSheet } from './src/Devices';
 
 // Connexion : page HA (bouton Google) → iotrigger://auth?code=… → jeton longue durée mémorisé côté natif
 function App() {
@@ -118,6 +122,7 @@ function Home({
   const [areas, setAreas] = useState<Area[]>([]);
   const [space, setSpace] = useState<string | null>(null);
   const [newSpace, setNewSpace] = useState<string | null>(null);
+  const [editSpace, setEditSpace] = useState<Area | null>(null);
 
   // Synchro HA toutes les 10 s : registres (appareils, espaces, libellés) + états
   const refresh = useCallback(async () => {
@@ -263,6 +268,7 @@ function Home({
               <Pressable
                 key={a.area_id}
                 onPress={() => setSpace(a.area_id)}
+                onLongPress={() => admin && setEditSpace(a)}
                 style={[s.tab, a.area_id === current && s.tabOn]}
               >
                 <Text style={[s.tabTxt, a.area_id === current && s.tabTxtOn]}>
@@ -349,14 +355,35 @@ function Home({
           onRemove={d => toggle(d, false)}
           readOnly={!admin}
           areas={areas}
+          onRename={(d, n) => run(renameDevice(d, n))}
           onArea={(d, id) => {
             setSpace(id);
             run(setArea(d, id));
           }}
         />
+        <SpaceSheet
+          area={editSpace}
+          count={inApp.filter(d => d.areaId === editSpace?.area_id).length}
+          onClose={() => setEditSpace(null)}
+          onRename={n => editSpace && run(renameArea(editSpace.area_id, n))}
+          onDelete={() =>
+            editSpace &&
+            Alert.alert(`Supprimer « ${editSpace.name} » ?`, '', [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Supprimer',
+                style: 'destructive',
+                onPress: () => {
+                  run(deleteArea(editSpace.area_id));
+                  setEditSpace(null);
+                },
+              },
+            ])
+          }
+        />
         <AddSheet
           visible={adding}
-          devices={devices.filter(d => !d.inApp)}
+          devices={devices.filter(d => !d.inApp || !d.areaId)}
           onClose={() => setAdding(false)}
           onAdd={d =>
             run(

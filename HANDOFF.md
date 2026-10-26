@@ -92,6 +92,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 
 ## App : cards dynamiques (2026-10-24)
 
+- Édition (2026-10-27) : fiche appareil = nom + espace + retirer ; appui long sur un onglet = renommer/supprimer l'espace (appareils sans espace → listés dans ＋).
 - Un appareil HA apparaît dans l'app s'il porte le **libellé `app`** (bouton ＋ dans l'app, ou HA → Appareils → libellés).
 - ESP32 : flasher ESPHome, l'adopter dans HA → il apparaît dans ＋. Contrôles auto par domaine (switch/light, number, select, button, cover, camera).
 - Vidéo : HLS avec tampon live ~2 s, réouverture au retour au premier plan/erreur. Latence plus basse = WebRTC (non fait).

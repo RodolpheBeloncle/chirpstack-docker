@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { HA_URL } from './config';
@@ -212,6 +213,7 @@ export function DeviceSheet({
   onRemove,
   areas,
   onArea,
+  onRename,
   readOnly,
 }: {
   device: Device | null;
@@ -221,6 +223,7 @@ export function DeviceSheet({
   onRemove: (d: Device) => void;
   areas: Area[];
   onArea: (d: Device, areaId: string) => void;
+  onRename: (d: Device, name: string) => void;
   readOnly: boolean;
 }) {
   return (
@@ -255,6 +258,16 @@ export function DeviceSheet({
           </View>
           {!readOnly && (
           <>
+          <Text style={s.area}>Nom</Text>
+          <TextInput
+            key={device.id}
+            defaultValue={device.name}
+            onEndEditing={e => {
+              const n = e.nativeEvent.text.trim();
+              if (n && n !== device.name) onRename(device, n);
+            }}
+            style={[s.group, s.input]}
+          />
           <Text style={s.area}>Espace</Text>
           <View style={s.chips}>
             {areas.map(a => (
@@ -276,6 +289,58 @@ export function DeviceSheet({
           </Pressable>
           </>
           )}
+        </ScrollView>
+      )}
+    </Modal>
+  );
+}
+
+// Réglages d'un espace (appui long sur l'onglet) : renommer, supprimer
+export function SpaceSheet({
+  area,
+  count,
+  onClose,
+  onRename,
+  onDelete,
+}: {
+  area: Area | null;
+  count: number;
+  onClose: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  return (
+    <Modal
+      visible={!!area}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      {area && (
+        <ScrollView style={s.sheet} contentContainerStyle={s.sheetContent}>
+          <View style={s.sheetHead}>
+            <Text style={[s.sheetTitle, s.flex]}>Espace</Text>
+            <Pressable onPress={onClose} hitSlop={12}>
+              <Text style={s.link}>OK</Text>
+            </Pressable>
+          </View>
+          <Text style={s.area}>Nom</Text>
+          <TextInput
+            defaultValue={area.name}
+            onEndEditing={e => {
+              const n = e.nativeEvent.text.trim();
+              if (n && n !== area.name) onRename(n);
+            }}
+            style={[s.group, s.input]}
+          />
+          <Text style={s.hint}>{count} appareil(s) dans cet espace.</Text>
+          <Pressable onPress={onDelete} style={s.remove}>
+            <Text style={s.removeTxt}>Supprimer l'espace</Text>
+          </Pressable>
+          <Text style={s.hint}>
+            Les appareils ne sont pas supprimés : ils restent dans Home
+            Assistant, sans espace (visibles via ＋).
+          </Text>
         </ScrollView>
       )}
     </Modal>
@@ -425,4 +490,5 @@ const s = StyleSheet.create({
   removeTxt: { color: '#ff3b30', fontSize: 16 },
   hint: { color: C.muted, fontSize: 14 },
   plus: { color: '#007aff', fontSize: 24 },
+  input: { color: C.text, fontSize: 16, padding: 16 },
 });
