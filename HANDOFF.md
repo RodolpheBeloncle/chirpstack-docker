@@ -76,7 +76,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
   côté serveur rien n'entre depuis wg0 (INPUT/DOCKER-USER DROP hors réponses). Gateway LoRa plus tard = ouvrir explicitement son flux (UDP 1700 ou MQTT).
 - Let's Encrypt : 5 échecs/h max par domaine (DNS absent = échec) → ne lancer Traefik qu'après propagation DNS.
 - Pi : `iptables` absent par défaut sur bookworm → `apt install iptables` avant wg-quick. Config serveur LoRa dans `local_conf.json` (pas `global_conf.json`).
-- Mosquitto : comptes recréés à chaque démarrage par la `command` du compose (nouveau compte = l'ajouter au compose + variable Coolify, `mosquitto_passwd` à la main est effacé). Compte `esphome` (ESP32, `topic_prefix: esphome/<nom>`), cert serveur `mqtt.triggerstudio.dev` + IP 31.70.69.194 signé par la CA locale (2036). Port 8883 public : compose prêt, **pas encore déployé dans Coolify** (+ règle pare-feu hébergeur TCP 8883 + DNS `mqtt.` à faire).
+- Mosquitto : comptes recréés à chaque démarrage par la `command` du compose (nouveau compte = l'ajouter au compose + variable Coolify, `mosquitto_passwd` à la main est effacé). Compte `esphome` (ESP32, `topic_prefix: esphome/<nom>`), cert serveur `mqtt.triggerstudio.dev` + IP 31.70.69.194 signé par la CA locale (2036). Port 8883 public : **déployé** (cert actif, DNS `mqtt.triggerstudio.dev`→31.70.69.194 OK, docker publie 8883). Reste : `ufw allow 8883/tcp` sur le serveur (bloqué par le garde-fou Claude Code).
 - Mosquitto : ACL `configuration/mosquitto/config/acl` (chirpstack, homeassistant, frigate). Nouveau compte = l'y ajouter, sinon il ne voit rien.
 
 ## Prochaines étapes (ordre)
