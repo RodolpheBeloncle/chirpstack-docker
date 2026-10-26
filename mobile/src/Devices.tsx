@@ -338,8 +338,8 @@ export function SpaceSheet({
             <Text style={s.removeTxt}>Supprimer l'espace</Text>
           </Pressable>
           <Text style={s.hint}>
-            Les appareils ne sont pas supprimés : ils restent dans Home
-            Assistant, sans espace (visibles via ＋).
+            Les appareils ne sont pas supprimés : ils passent dans l'onglet
+            « Sans espace ».
           </Text>
         </ScrollView>
       )}

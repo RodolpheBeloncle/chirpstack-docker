@@ -172,13 +172,17 @@ function Home({
 
   const inApp = devices.filter(d => d.inApp);
   // Espaces affichés = ceux qui contiennent un appareil de l'app ; espace courant par défaut = le premier
-  const spaces = areas.filter(
-    a => a.area_id === space || inApp.some(d => d.areaId === a.area_id),
-  );
+  // Appareils sans pièce HA (espace supprimé, ou rangé nulle part) : onglet « Sans espace » plutôt qu'invisibles
+  const spaces = [
+    ...areas.filter(
+      a => a.area_id === space || inApp.some(d => d.areaId === a.area_id),
+    ),
+    ...(inApp.some(d => !d.areaId) ? [{ area_id: NONE, name: 'Sans espace' }] : []),
+  ];
   const current = spaces.some(a => a.area_id === space)
     ? space
     : spaces[0]?.area_id ?? null;
-  const mine = inApp.filter(d => !current || d.areaId === current);
+  const mine = inApp.filter(d => current === null || (d.areaId ?? NONE) === current);
   // Caméra de l'espace courant (flux SD `_sd` préféré : plus stable en 4G)
   const cams = mine.flatMap(d => d.entities).filter(e => e.startsWith('camera.'));
   const camera = cams.find(e => e.endsWith('_sd')) ?? cams[0] ?? null;
@@ -268,7 +272,7 @@ function Home({
               <Pressable
                 key={a.area_id}
                 onPress={() => setSpace(a.area_id)}
-                onLongPress={() => admin && setEditSpace(a)}
+                onLongPress={() => admin && a.area_id !== NONE && setEditSpace(a)}
                 style={[s.tab, a.area_id === current && s.tabOn]}
               >
                 <Text style={[s.tabTxt, a.area_id === current && s.tabTxtOn]}>
@@ -383,7 +387,7 @@ function Home({
         />
         <AddSheet
           visible={adding}
-          devices={devices.filter(d => !d.inApp || !d.areaId)}
+          devices={devices.filter(d => !d.inApp)}
           onClose={() => setAdding(false)}
           onAdd={d =>
             run(
@@ -399,6 +403,7 @@ function Home({
 }
 
 const GAP = 12;
+const NONE = ''; // pseudo-espace des appareils sans pièce
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
