@@ -23,7 +23,7 @@ const value = (st?: EntityState) =>
     ? '—'
     : `${st.state} ${st.attributes.unit_of_measurement ?? ''}`.trim();
 
-// Nom d'entité sans le préfixe du nom de l'appareil (« Sonde jardin Humidité » → « Humidité »)
+// Nom d'entité sans le préfixe du nom de l'appareil (« Sonde Humidité » → « Humidité »)
 const short = (st: EntityState | undefined, dev: Device) =>
   label(st).replace(dev.name, '').trim() || label(st);
 

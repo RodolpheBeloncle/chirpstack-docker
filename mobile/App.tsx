@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { HA_URL, CAMERA } from './src/config';
+import { HA_URL } from './src/config';
 import {
   Area,
   createArea,
@@ -165,14 +165,28 @@ function Home({
     }
   };
 
+  const inApp = devices.filter(d => d.inApp);
+  // Espaces affichés = ceux qui contiennent un appareil de l'app ; espace courant par défaut = le premier
+  const spaces = areas.filter(
+    a => a.area_id === space || inApp.some(d => d.areaId === a.area_id),
+  );
+  const current = spaces.some(a => a.area_id === space)
+    ? space
+    : spaces[0]?.area_id ?? null;
+  const mine = inApp.filter(d => !current || d.areaId === current);
+  // Caméra de l'espace courant (flux SD `_sd` préféré : plus stable en 4G)
+  const cams = mine.flatMap(d => d.entities).filter(e => e.startsWith('camera.'));
+  const camera = cams.find(e => e.endsWith('_sd')) ?? cams[0] ?? null;
+  const showCamera = camera !== null;
+
   // Vidéo HLS ; en cas d'échec, repli sur le snapshot HA rafraîchi chaque seconde
   const [stream, setStream] = useState<string | null>(null);
   const [frame, setFrame] = useState(0);
   // Nouvelle URL = retour au direct : au lancement, au retour au premier plan, et après une erreur
   const openStream = useCallback(() => {
     setStream(null);
-    hlsUrl(CAMERA).then(setStream, e => setError(`Vidéo : ${e.message}`));
-  }, []);
+    if (camera) hlsUrl(camera).then(setStream, e => setError(`Vidéo : ${e.message}`));
+  }, [camera]);
   useEffect(() => {
     openStream();
     const sub = AppState.addEventListener(
@@ -207,16 +221,6 @@ function Home({
     }
   };
 
-  const inApp = devices.filter(d => d.inApp);
-  // Espaces affichés = ceux qui contiennent un appareil de l'app ; espace courant par défaut = le premier
-  const spaces = areas.filter(
-    a => a.area_id === space || inApp.some(d => d.areaId === a.area_id),
-  );
-  const current = spaces.some(a => a.area_id === space)
-    ? space
-    : spaces[0]?.area_id ?? null;
-  const mine = inApp.filter(d => !current || d.areaId === current);
-  const showCamera = mine.some(d => d.entities.includes(CAMERA));
 
   // Grille responsive : colonnes de ~170 px min, contenu centré et borné sur tablette
   const { width } = useWindowDimensions();
@@ -311,7 +315,7 @@ function Home({
               style={s.camera}
               fadeDuration={0}
               source={{
-                uri: `${HA_URL}${states[CAMERA]?.attributes.entity_picture}&t=${frame}`,
+                uri: `${HA_URL}${states[camera!]?.attributes.entity_picture}&t=${frame}`,
               }}
             />
           )}

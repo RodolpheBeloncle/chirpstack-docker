@@ -1,20 +1,26 @@
 # Notifications vers l'app Android (événement `iotrigger_notify` → sensor.notification → NotifyService.kt)
+# Génériques : s'appliquent à tout appareil, quelle que soit sa pièce. Titre = pièce HA de l'appareil.
+# ponytail: écoute tous les state_changed (filtrés par device_class) ; OK à l'échelle d'une maison
 - id: iotrigger_notif_sol_sec
-  alias: "Notification : sol sec"
+  alias: "Notification : sol sec (toute sonde)"
+  mode: parallel
   trigger:
-    - platform: numeric_state
-      entity_id: sensor.sol_humidite
-      below: 20  # seuil à ajuster une fois la sonde en place
-      for: "00:30:00"
+    - platform: event
+      event_type: state_changed
+  condition:
+    - >-
+      {% set n = trigger.event.data.new_state %}{% set o = trigger.event.data.old_state %}
+      {{ n is not none and o is not none and n.attributes.device_class == 'moisture'
+         and n.domain == 'sensor' and n.state | is_number and o.state | is_number
+         and n.state | float < 20 <= o.state | float }}
   action:
     - event: iotrigger_notify
       event_data:
-        # Espace (pièce HA) de l'appareil : suit les déplacements faits dans l'app
-        title: "Sol sec ({{ area_name('sensor.sol_humidite') or 'jardin' }})"
-        message: "Humidité du sol à {{ states('sensor.sol_humidite') }} %"
+        title: "Sol sec ({{ area_name(trigger.event.data.entity_id) or device_attr(trigger.event.data.entity_id, 'name') }})"
+        message: "{{ trigger.event.data.new_state.name }} : {{ trigger.event.data.new_state.state }} %"
 
 - id: iotrigger_notif_personne
-  alias: "Notification : personne détectée"
+  alias: "Notification : personne détectée (toute caméra)"
   trigger:
     - platform: mqtt
       topic: frigate/events
@@ -23,5 +29,50 @@
   action:
     - event: iotrigger_notify
       event_data:
-        title: "Personne détectée ({{ area_name('camera.jardin_sd') or 'caméra' }})"
-        message: "Détection caméra à {{ now().strftime('%H:%M') }}"
+        title: "Personne détectée ({{ trigger.payload_json.after.camera | replace('_', ' ') }})"
+        message: "Détection à {{ now().strftime('%H:%M') }}"
+
+# Tout appareil ChirpStack qui émet un uplink apparaît dans HA (puis dans le ＋ de l'app) sans YAML :
+# un capteur par champ décodé (`object`) + SNR, appareil HA = DevEUI, nom = nom ChirpStack.
+# ponytail: republie les configs (retain) à chaque uplink ; filtrer sur fCnt si le trafic grossit
+- id: iotrigger_lorawan_discovery
+  alias: "LoRaWAN : découverte auto ChirpStack"
+  mode: queued
+  trigger:
+    - platform: mqtt
+      topic: application/+/device/+/event/up
+  condition:
+    - "{{ trigger.payload_json.object is defined and trigger.payload_json.deviceInfo is defined }}"
+  action:
+    - variables:
+        info: "{{ trigger.payload_json.deviceInfo }}"
+        device:
+          identifiers: ["{{ info.devEui }}"]
+          name: "{{ info.deviceName }}"
+          model: "{{ info.deviceProfileName | default('LoRaWAN') }}"
+        # Champs connus (codecs Dragino) : nom, unité, classe. Inconnu → capteur brut au nom du champ.
+        known:
+          water_SOIL: { name: Humidité, unit: "%", class: moisture }
+          temp_SOIL: { name: Température sol, unit: "°C", class: temperature }
+          conduct_SOIL: { name: Conductivité, unit: "µS/cm" }
+          TempC_SHT: { name: Température, unit: "°C", class: temperature }
+          Hum_SHT: { name: Humidité air, unit: "%", class: humidity }
+          BatV: { name: Batterie, unit: "V", class: voltage }
+          Bat: { name: Batterie, unit: "V", class: voltage }
+        fields: "{{ trigger.payload_json.object.items() | rejectattr(1, 'mapping') | map(attribute=0) | list }}"
+    - repeat:
+        for_each: "{{ fields + ['snr'] }}"
+        sequence:
+          - variables:
+              k: "{{ known.get(repeat.item, {'name': 'Signal (SNR)', 'unit': 'dB', 'class': 'signal_strength'} if repeat.item == 'snr' else {}) }}"
+              path: "{{ 'rxInfo[0].snr' if repeat.item == 'snr' else 'object.' ~ repeat.item }}"
+          - action: mqtt.publish
+            data:
+              topic: "homeassistant/sensor/{{ info.devEui }}/{{ repeat.item }}/config"
+              retain: true
+              payload: >-
+                {% set p = dict(name=k.name | default(repeat.item), unique_id=info.devEui ~ '_' ~ repeat.item,
+                  state_topic=trigger.topic, value_template='{{ value_json.' ~ path ~ ' }}', device=device) %}
+                {% if k.unit is defined %}{% set p = dict(p, unit_of_measurement=k.unit, state_class='measurement') %}{% endif %}
+                {% if k.class is defined %}{% set p = dict(p, device_class=k.class) %}{% endif %}
+                {{ p | tojson }}

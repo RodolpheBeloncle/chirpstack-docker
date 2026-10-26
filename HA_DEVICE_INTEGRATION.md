@@ -15,22 +15,13 @@ on déclare les entités en YAML, c'est court et versionné.
 
 L'`APP_ID` (UUID de l'application) est dans l'URL ChirpStack : `/applications/<APP_ID>`.
 
-## 2. Home Assistant — capteurs (uplink)
+## 2. Home Assistant — capteurs (uplink) : automatique
 
-Topic publié par ChirpStack : `application/<APP_ID>/device/<DEV_EUI>/event/up` (DevEUI en minuscules).
-
-Dans `configuration/homeassistant/configuration.yaml`, section `mqtt: sensor:` :
-
-```yaml
-    - name: "Sol humidité"                 # → entity_id sensor.sol_humidite
-      unique_id: sol_humidite              # permet d'éditer l'entité dans l'UI
-      state_topic: "application/<APP_ID>/device/<DEV_EUI>/event/up"
-      value_template: "{{ value_json.object.<champ_du_codec> }}"
-      unit_of_measurement: "%"
-      device_class: moisture               # icône + graphes adaptés
-```
-
-Méta utiles hors `object` : `value_json.rxInfo[0].rssi`, `value_json.rxInfo[0].snr`, `value_json.fCnt`.
+Rien à écrire. L'automatisation `iotrigger_lorawan_discovery` (`automations_iotrigger.yaml`) écoute
+`application/+/device/+/event/up` et crée par MQTT discovery un capteur par champ de `object` + le SNR,
+regroupés dans un appareil HA nommé comme dans ChirpStack (identifiant = DevEUI).
+Unités/classes : table `known` de l'automatisation (ajouter une ligne pour un nouveau champ, sinon capteur brut).
+Ensuite : HA → Appareils → lui donner une pièce, ou directement le ＋ de l'app.
 
 ## 3. Home Assistant — actionneur (downlink)
 

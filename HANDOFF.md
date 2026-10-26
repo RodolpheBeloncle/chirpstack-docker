@@ -20,10 +20,10 @@ Contraintes exprimées :
 | ChirpStack v4 | tourne (docker compose) | http://localhost:8080 |
 | Mosquitto | user `homeassistant` ajouté (mdp `MOSQUITTO_HA_PASSWORD` dans `.env`) | interne `mosquitto:1883`, externe 8883 TLS |
 | Home Assistant | conteneur `homeassistant`, intégration MQTT configurée | http://localhost:8123 (user `rodolphe_beloncle`) |
-| Capteurs démo | `configuration/homeassistant/configuration.yaml` (section `mqtt:`) | topics `application/demo/device/a840410000000001/...` |
+| Capteurs LoRaWAN | **auto** : automatisation `iotrigger_lorawan_discovery` (MQTT discovery depuis chaque uplink ChirpStack) ; `mqtt:` YAML = actionneurs seulement | déployé 2026-10-26, testé (5 entités créées, ex. `sensor.iot_appareils_sonde_humidite`) ; backups `*.bak-20261026` sur le serveur |
 | Simulateur | `scripts/simulate-uplink.sh [intervalle_s]` publie de faux uplinks ChirpStack | — |
 | App Android | `mobile/` (React Native CLI 0.85.2), vidéo HLS via WebSocket HA `camera/stream` + `react-native-video` (repli snapshot `entity_picture`) | voir `mobile/README.md` |
-| Dashboard HA "Jardin" | `configuration/homeassistant/dashboards/jardin.yaml` (YAML) | http://localhost:8123/dashboard-jardin |
+| Dashboard HA "Jardin" | mode storage (éditable UI) : `.storage/lovelace.dashboard_jardin` + `.storage/lovelace_dashboards` sur le serveur (plus de YAML ; ancien `jardin.yaml` dans l'historique git et `/root/ha-backup/`) | http://localhost:8123/dashboard-jardin |
 | Caméra Teruhal TC55 (Eseecloud) | `192.168.1.16`, RTSP `live/ch00_0` (HEVC 1080p) **sans auth** → service `go2rtc` → HA `camera.jardin` | go2rtc UI http://127.0.0.1:1984 |
 | Frigate (NVR, détection CPU, MQTT user `frigate`) | `configuration/frigate/config.yml`, lit les flux via go2rtc, enreg. motion 3 j / alertes 14 j | https://127.0.0.1:8971 (user `admin`, mdp généré au 1er lancement, à changer) |
 
@@ -53,6 +53,8 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 
 ## Pièges déjà rencontrés
 
+- **HA = hub de toute la maison** (jardin, maison, cour, chambres…) : rien de spécifique à une pièce dans la config ni l'app. Alertes génériques (par `device_class` / caméra Frigate), caméra de l'app = caméra de l'espace courant.
+
 - **chirp2mqtt** = add-on HA OS (repo `modrisb/chirpha`), inutilisable avec HA en Docker. Ne pas le reproposer.
 - **HACS** : flux d'auth GitHub plante (aiohttp "Got more than 8190 bytes"). Désinstallé, inutile ici.
 - Noms d'entités HA dérivés du `name` (`Sol humidité` → `sensor.sol_humidite`).
@@ -80,8 +82,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 
 1. **Tester l'app** sur le téléphone avec la démo (simulateur lancé, token HA dans `mobile/src/config.ts`).
 2. **Quand la SE01-LS arrive** : l'enregistrer dans ChirpStack (EU868, OTAA, codec Dragino
-   `dragino/dragino-end-node-decoder`), lire une trame réelle, remplacer `demo` + DevEUI + noms de champs
-   dans `configuration.yaml`. Test de portée 5 km (SNR > −15 dB à SF12 sinon antenne extérieure).
+   `dragino/dragino-end-node-decoder`), lire une trame réelle, ajouter ses champs à la table `known` si besoin (capteurs créés tout seuls). Test de portée 5 km (SNR > −15 dB à SF12 sinon antenne extérieure).
 3. **Vanne** : vraie commande downlink + retour d'état.
 4. **Déploiement sécurisé via Coolify** (demandé par l'utilisateur) : ACL Mosquitto, HA derrière HTTPS
    (ou accès VPN WireGuard/Tailscale), passer l'URL de l'app en HTTPS, keystore release.
