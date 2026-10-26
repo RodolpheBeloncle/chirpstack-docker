@@ -129,6 +129,7 @@ services:
       - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
       - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
       - MOSQUITTO_ESPHOME_PASSWORD=${MOSQUITTO_ESPHOME_PASSWORD}
+      - MOSQUITTO_DEVICES=${MOSQUITTO_DEVICES:-}
     entrypoint: /bin/sh
     user: root
     command:
@@ -139,6 +140,8 @@ services:
         mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd frigate "$$MOSQUITTO_FRIGATE_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd esphome "$$MOSQUITTO_ESPHOME_PASSWORD"
+        # un compte par ESP32 : MOSQUITTO_DEVICES="nom1:mdp1 nom2:mdp2" (nom = name ESPHome)
+        for d in $$MOSQUITTO_DEVICES; do mosquitto_passwd -b /mosquitto/auth/passwd "$${d%%:*}" "$${d#*:}"; done
         chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
         chmod 600 /mosquitto/auth/passwd
         exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
