@@ -211,6 +211,7 @@ services:
         mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd frigate "$$MOSQUITTO_FRIGATE_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd esphome "$$MOSQUITTO_ESPHOME_PASSWORD"
         chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
         chmod 600 /mosquitto/auth/passwd
         exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"
@@ -219,6 +220,7 @@ services:
       - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
       - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
       - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
+      - MOSQUITTO_ESPHOME_PASSWORD=${MOSQUITTO_ESPHOME_PASSWORD}
     image: eclipse-mosquitto:2
     healthcheck:
       test: ["CMD-SHELL","nc -z localhost 1883 || exit 1"]
@@ -228,6 +230,12 @@ services:
       start_period: 60s
     networks:
       default: null
+    # MQTT TLS public : ESP32 (compte esphome) depuis n'importe quel réseau
+    ports:
+      - mode: ingress
+        protocol: tcp
+        published: "8883"
+        target: 8883
     restart: unless-stopped
     user: root
     volumes:

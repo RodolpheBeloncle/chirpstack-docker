@@ -128,6 +128,7 @@ services:
       - MOSQUITTO_CHIRPSTACK_PASSWORD=${MOSQUITTO_CHIRPSTACK_PASSWORD}
       - MOSQUITTO_HA_PASSWORD=${MOSQUITTO_HA_PASSWORD}
       - MOSQUITTO_FRIGATE_PASSWORD=${MOSQUITTO_FRIGATE_PASSWORD}
+      - MOSQUITTO_ESPHOME_PASSWORD=${MOSQUITTO_ESPHOME_PASSWORD}
     entrypoint: /bin/sh
     user: root
     command:
@@ -137,6 +138,7 @@ services:
         mosquitto_passwd -b -c /mosquitto/auth/passwd chirpstack "$$MOSQUITTO_CHIRPSTACK_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd homeassistant "$$MOSQUITTO_HA_PASSWORD"
         mosquitto_passwd -b /mosquitto/auth/passwd frigate "$$MOSQUITTO_FRIGATE_PASSWORD"
+        mosquitto_passwd -b /mosquitto/auth/passwd esphome "$$MOSQUITTO_ESPHOME_PASSWORD"
         chown -R mosquitto:mosquitto /mosquitto/auth /mosquitto/data
         chmod 600 /mosquitto/auth/passwd
         exec su -s /bin/sh mosquitto -c "/usr/sbin/mosquitto -c /mosquitto/config/mosquitto.conf"

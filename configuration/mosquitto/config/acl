@@ -8,6 +8,13 @@ user homeassistant
 topic readwrite application/#
 topic readwrite homeassistant/#
 topic read frigate/#
+# ESP32 (ESPHome, topic_prefix esphome/<nom>) : états + commandes
+topic readwrite esphome/#
 
 user frigate
 topic readwrite frigate/#
+
+# Tous les ESP32 (ESPHome) : un compte partagé, discovery HA + topics sous esphome/<nom>
+user esphome
+topic readwrite esphome/#
+topic readwrite homeassistant/#

@@ -13,7 +13,7 @@ services:
   chirpstack-rest-api:
     ports: !reset []
   mosquitto:
-    ports: !reset []
+    ports: !override ["8883:8883"]  # TLS public (ESP32) ; 1883 reste interne
   go2rtc:
     ports: !override ["10.77.0.1:1984:1984"]
   frigate:
