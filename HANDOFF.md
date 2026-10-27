@@ -83,7 +83,8 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Audit sécu 2026-10-27 (corrigé) : SSH serveur **clé uniquement** (`/etc/ssh/sshd_config.d/00-hardening.conf`) ; fail2ban réparé (`jail.local` était mal formé, sshd ports 22,2222) ;
   secret API ChirpStack régénéré (serveur seulement, `chirpstack.toml` du repo garde la valeur par défaut → ne pas l'écraser sur le serveur) ;
   ports Docker publics 8000/8080/6001/6002 (Coolify, contournent ufw) fermés depuis ens6 + limite 8883 IPv6 via `/usr/local/sbin/docker-user-hardening.sh` (lancé par PostUp de wg0.conf) ;
-  HSTS sur HA via labels Traefik dans `docker-compose.coolify-ui.yml` (nom du routeur Coolify codé en dur). Restent : mot de passe caméra, keystore release.
+  HSTS sur HA via labels Traefik dans `docker-compose.coolify-ui.yml` (nom du routeur Coolify codé en dur). Reste : mot de passe caméra.
+- Keystore release : `~/Desktop/iot-backup/iotrigger-release.keystore` (alias `iotrigger`), mots de passe dans `~/.gradle/gradle.properties` (`IOTRIGGER_*`, jamais affichés). Sans ces propriétés, la release retombe sur la clé debug. **Perdre le keystore = impossible de mettre à jour l'app installée.** Passage debug→release : désinstaller l'app d'abord (signature différente).
 
 ## Prochaines étapes (ordre)
 

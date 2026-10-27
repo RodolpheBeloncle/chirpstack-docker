@@ -93,15 +93,22 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Keystore + mots de passe hors repo : ~/.gradle/gradle.properties (IOTRIGGER_*)
+        if (project.hasProperty('IOTRIGGER_STORE_FILE')) {
+            release {
+                storeFile file(IOTRIGGER_STORE_FILE)
+                storePassword IOTRIGGER_STORE_PASSWORD
+                keyAlias IOTRIGGER_KEY_ALIAS
+                keyPassword IOTRIGGER_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.findByName('release') ?: signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
