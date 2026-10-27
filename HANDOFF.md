@@ -80,6 +80,11 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - Mosquitto : ACL `configuration/mosquitto/config/acl`. ESP32 = **un compte par appareil** via la variable Coolify `MOSQUITTO_DEVICES="nom1:mdp1 nom2:mdp2"` (nom = `name` ESPHome) ; ACL `pattern` %u → chacun limité à `esphome/<nom>/#` + sa discovery (testé 2026-10-27). Le compte `esphome` partagé est donc restreint à `esphome/esphome/#`.
 - Durcissement 2026-10-27 : ChirpStack retiré du domaine public (VPN seulement : http://10.77.0.1:8081) ; `ca.key` sortie du projet → `~/Desktop/iot-backup/` (à mettre sur disque externe, nécessaire pour signer un nouveau cert) ; copie de la sauvegarde mensuelle dans `~/Desktop/iot-backup/` (2,2 Mo, `scp root@31.70.69.194:/opt/backups/iot-stack.tar.gz`).
 
+- Audit sécu 2026-10-27 (corrigé) : SSH serveur **clé uniquement** (`/etc/ssh/sshd_config.d/00-hardening.conf`) ; fail2ban réparé (`jail.local` était mal formé, sshd ports 22,2222) ;
+  secret API ChirpStack régénéré (serveur seulement, `chirpstack.toml` du repo garde la valeur par défaut → ne pas l'écraser sur le serveur) ;
+  ports Docker publics 8000/8080/6001/6002 (Coolify, contournent ufw) fermés depuis ens6 + limite 8883 IPv6 via `/usr/local/sbin/docker-user-hardening.sh` (lancé par PostUp de wg0.conf) ;
+  HSTS sur HA via labels Traefik dans `docker-compose.coolify-ui.yml` (nom du routeur Coolify codé en dur). Restent : mot de passe caméra, keystore release.
+
 ## Prochaines étapes (ordre)
 
 1. **Tester l'app** sur le téléphone avec la démo (simulateur lancé, token HA dans `mobile/src/config.ts`).

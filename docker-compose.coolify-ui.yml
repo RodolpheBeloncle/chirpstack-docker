@@ -188,6 +188,10 @@ services:
     environment:
       - TZ=Europe/Paris
     image: ghcr.io/home-assistant/home-assistant:stable
+    labels:
+      # HSTS : ajouté au routeur HTTPS généré par Coolify (nom = https-0-<uuid>-homeassistant-bdda)
+      - traefik.http.middlewares.ha-hsts.headers.stsSeconds=31536000
+      - traefik.http.routers.https-0-8q3bqxofsb5unbrb3s7nm2ed-homeassistant-bdda.middlewares=gzip-sse,ha-hsts
     healthcheck:
       test: ["CMD-SHELL","curl -fsS -o /dev/null http://localhost:8123/manifest.json || exit 1"]
       interval: 30s
