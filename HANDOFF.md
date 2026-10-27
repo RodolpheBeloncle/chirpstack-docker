@@ -86,6 +86,9 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
   HSTS sur HA via labels Traefik dans `docker-compose.coolify-ui.yml` (nom du routeur Coolify codé en dur). Reste : mot de passe caméra.
 - Keystore release : `~/Desktop/iot-backup/iotrigger-release.keystore` (alias `iotrigger`), mots de passe dans `~/.gradle/gradle.properties` (`IOTRIGGER_*`, jamais affichés). Sans ces propriétés, la release retombe sur la clé debug. **Perdre le keystore = impossible de mettre à jour l'app installée.** Passage debug→release : désinstaller l'app d'abord (signature différente).
 
+- SSH serveur (2026-10-27) : **root interdit** sauf depuis le réseau Coolify `10.0.0.0/16` (`/etc/ssh/sshd_config.d/10-root.conf`) → se connecter en `rodolphe@31.70.69.194` + `sudo` (NOPASSWD). Redéploiement Coolify à vérifier après ce changement.
+  fail2ban bannit 1 h après 5 échecs/10 min (SSH en « Connection refused ») : débannir via terminal Coolify ou console hébergeur `fail2ban-client set sshd unbanip <IP>` ; whitelist `ignoreip` dans `/etc/fail2ban/jail.local` (IP maison 86.219.52.199, change si la box change d'IP).
+
 ## Prochaines étapes (ordre)
 
 1. **Tester l'app** sur le téléphone avec la démo (simulateur lancé, token HA dans `mobile/src/config.ts`).
