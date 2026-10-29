@@ -19,3 +19,5 @@ configuration/frigate/*
 
 # Clé privée WireGuard maison
 configuration/wireguard-home/
+esphome/secrets.yaml
+esphome/.esphome/
