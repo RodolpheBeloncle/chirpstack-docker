@@ -8,14 +8,18 @@ export const setToken = (t: string) => (HA_TOKEN = t);
 export const CLIENT_ID = `${HA_URL}/local/iotrigger.html`;
 export const REDIRECT = 'iotrigger://auth';
 export const loginUrl = () =>
-  `${HA_URL}/auth/authorize?client_id=${encodeURIComponent(CLIENT_ID)}&redirect_uri=${encodeURIComponent(REDIRECT)}`;
+  `${HA_URL}/auth/authorize?client_id=${encodeURIComponent(
+    CLIENT_ID,
+  )}&redirect_uri=${encodeURIComponent(REDIRECT)}`;
 
 // Code d'autorisation → jeton court → jeton longue durée (même rôle que l'utilisateur)
 export async function exchange(code: string) {
   const res = await fetch(`${HA_URL}/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&client_id=${encodeURIComponent(CLIENT_ID)}`,
+    body: `grant_type=authorization_code&code=${encodeURIComponent(
+      code,
+    )}&client_id=${encodeURIComponent(CLIENT_ID)}`,
   });
   if (!res.ok) throw new Error(`Connexion refusée (HTTP ${res.status})`);
   setToken((await res.json()).access_token);
@@ -31,7 +35,10 @@ export const currentUser = () =>
 export type EntityState = {
   entity_id: string;
   state: string;
+  last_updated?: string;
+  last_reported?: string;
   attributes: {
+    device_class?: string;
     friendly_name?: string;
     unit_of_measurement?: string;
     entity_picture?: string;
@@ -65,7 +72,9 @@ export const callService = (entityId: string, service: string, data = {}) =>
 // Une commande WebSocket HA (registres, flux caméra) : connexion ouverte puis fermée
 export function ws<T = any>(type: string, data: object = {}): Promise<T> {
   return new Promise((resolve, reject) => {
-    const sock = new WebSocket(`${HA_URL.replace(/^http/, 'ws')}/api/websocket`);
+    const sock = new WebSocket(
+      `${HA_URL.replace(/^http/, 'ws')}/api/websocket`,
+    );
     sock.onmessage = e => {
       const msg = JSON.parse(e.data);
       if (msg.type === 'auth_required')
@@ -74,7 +83,9 @@ export function ws<T = any>(type: string, data: object = {}): Promise<T> {
         sock.send(JSON.stringify({ id: 1, type, ...data }));
       else if (msg.type === 'result') {
         sock.close();
-        msg.success ? resolve(msg.result) : reject(new Error(msg.error?.message));
+        msg.success
+          ? resolve(msg.result)
+          : reject(new Error(msg.error?.message));
       } else if (msg.type === 'auth_invalid') reject(new Error('token refusé'));
     };
     sock.onerror = () => reject(new Error('WebSocket HA injoignable'));
@@ -94,6 +105,18 @@ export type Device = {
   areaId: string | null;
   inApp: boolean;
   entities: string[];
+  protocol: string;
+};
+
+// Protocole d'après le registre HA : DevEUI (16 hex) via MQTT = LoRaWAN (discovery ChirpStack), ESPHome = Wi-Fi
+const protocol = (d: any, entities: string[]) => {
+  const [domain, id] = d.identifiers?.[0] ?? [];
+  if (domain === 'mqtt' && /^[0-9a-f]{16}$/i.test(id)) return 'LoRaWAN';
+  if (domain === 'esphome' || d.manufacturer === 'Espressif')
+    return 'Wi-Fi (ESPHome)';
+  if (entities.some(e => e.startsWith('camera.'))) return 'Caméra IP (RTSP)';
+  if (domain === 'mqtt') return 'MQTT';
+  return domain ?? 'Inconnu';
 };
 
 const APP_LABEL = 'app';
@@ -102,7 +125,10 @@ const APP_LABEL = 'app';
 export type Area = { area_id: string; name: string };
 
 // Espaces de l'app = pièces (areas) HA
-export async function loadDevices(): Promise<{ devices: Device[]; areas: Area[] }> {
+export async function loadDevices(): Promise<{
+  devices: Device[];
+  areas: Area[];
+}> {
   const [devices, entities, areas] = await Promise.all([
     ws<any[]>('config/device_registry/list'),
     ws<any[]>('config/entity_registry/list'),
@@ -111,16 +137,20 @@ export async function loadDevices(): Promise<{ devices: Device[]; areas: Area[] 
   const areaName = Object.fromEntries(areas.map(a => [a.area_id, a.name]));
   const list = devices
     .filter(d => !d.disabled_by && d.entry_type !== 'service')
-    .map(d => ({
-      id: d.id,
-      name: d.name_by_user ?? d.name,
-      area: areaName[d.area_id] ?? '',
-      areaId: d.area_id,
-      inApp: d.labels.includes(APP_LABEL),
-      entities: entities
+    .map(d => {
+      const ents = entities
         .filter(e => e.device_id === d.id && !e.hidden_by && !e.disabled_by)
-        .map(e => e.entity_id),
-    }))
+        .map(e => e.entity_id);
+      return {
+        id: d.id,
+        name: d.name_by_user ?? d.name,
+        area: areaName[d.area_id] ?? '',
+        areaId: d.area_id,
+        inApp: d.labels.includes(APP_LABEL),
+        entities: ents,
+        protocol: protocol(d, ents),
+      };
+    })
     .filter(d => d.entities.length);
   return { devices: list, areas };
 }
@@ -129,7 +159,10 @@ export const createArea = (name: string) =>
   ws<Area>('config/area_registry/create', { name });
 
 export const renameDevice = (device: Device, name: string) =>
-  ws('config/device_registry/update', { device_id: device.id, name_by_user: name || null });
+  ws('config/device_registry/update', {
+    device_id: device.id,
+    name_by_user: name || null,
+  });
 
 export const renameArea = (areaId: string, name: string) =>
   ws('config/area_registry/update', { area_id: areaId, name });
@@ -139,7 +172,10 @@ export const deleteArea = (areaId: string) =>
   ws('config/area_registry/delete', { area_id: areaId });
 
 export const setArea = (device: Device, areaId: string) =>
-  ws('config/device_registry/update', { device_id: device.id, area_id: areaId });
+  ws('config/device_registry/update', {
+    device_id: device.id,
+    area_id: areaId,
+  });
 
 export async function setInApp(device: Device, inApp: boolean) {
   const labels = await ws<any[]>('config/label_registry/list');

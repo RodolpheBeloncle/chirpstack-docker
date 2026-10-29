@@ -53,7 +53,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 
 ## Pièges déjà rencontrés
 
-- **HA = hub de toute la maison** (jardin, maison, cour, chambres…) : rien de spécifique à une pièce dans la config ni l'app. Alertes génériques (par `device_class` / caméra Frigate), caméra de l'app = caméra de l'espace courant.
+- **HA = hub de toute la maison** (jardin, maison, cour, chambres…) : rien de spécifique à une pièce dans la config ni l'app. Alertes génériques (par `device_class` / caméra Frigate), caméra = vidéo en direct dans la fiche de l'appareil (plus de lecteur par défaut en haut de l'espace).
 
 - **chirp2mqtt** = add-on HA OS (repo `modrisb/chirpha`), inutilisable avec HA en Docker. Ne pas le reproposer.
 - **HACS** : flux d'auth GitHub plante (aiohttp "Got more than 8190 bytes"). Désinstallé, inutile ici.
@@ -102,6 +102,11 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
    À tester sur le téléphone ; exclure l'app de l'optimisation batterie sinon Android coupe le service.
 
 ## App : cards dynamiques (2026-10-24)
+
+- Refonte style Apple Home (2026-10-28) : tuiles horizontales, mode sombre (lu au lancement), listes groupées iOS,
+  menu ⋯ (déconnexion). **Fiche santé** par appareil (protocole déduit du registre HA, statut, dernière activité,
+  signal, batterie) + bandeau global « Tout est connecté / N à vérifier ». LoRaWAN « en retard » après 2 h sans trame.
+  Discovery LoRa : RSSI ajouté (`automations_iotrigger.yaml`) → déployé sur le serveur 2026-10-29 (backup `.bak-20261029`).
 
 - Édition (2026-10-27) : fiche appareil = nom + espace + retirer ; appui long sur un onglet = renommer/supprimer l'espace (appareils sans espace → onglet « Sans espace »).
 - Un appareil HA apparaît dans l'app s'il porte le **libellé `app`** (bouton ＋ dans l'app, ou HA → Appareils → libellés).

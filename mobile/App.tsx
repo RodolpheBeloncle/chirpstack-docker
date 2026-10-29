@@ -37,7 +37,14 @@ import {
   setInApp,
   setToken,
 } from './src/ha';
-import { AddSheet, C, DeviceCard, DeviceSheet, SpaceSheet } from './src/Devices';
+import {
+  AddSheet,
+  C,
+  DeviceCard,
+  DeviceSheet,
+  health,
+  SpaceSheet,
+} from './src/Devices';
 
 // Connexion : page HA (bouton Google) → iotrigger://auth?code=… → jeton longue durée mémorisé côté natif
 function App() {
@@ -86,7 +93,10 @@ function App() {
           <Image source={require('./assets/logo.png')} style={s.logo} />
           <Text style={s.title}>IoTrigger</Text>
           {error && <Text style={s.error}>{error}</Text>}
-          <Pressable style={s.loginBtn} onPress={() => Linking.openURL(loginUrl())}>
+          <Pressable
+            style={s.loginBtn}
+            onPress={() => Linking.openURL(loginUrl())}
+          >
             <Text style={s.loginTxt}>Se connecter</Text>
           </Pressable>
         </SafeAreaView>
@@ -177,16 +187,22 @@ function Home({
     ...areas.filter(
       a => a.area_id === space || inApp.some(d => d.areaId === a.area_id),
     ),
-    ...(inApp.some(d => !d.areaId) ? [{ area_id: NONE, name: 'Sans espace' }] : []),
+    ...(inApp.some(d => !d.areaId)
+      ? [{ area_id: NONE, name: 'Sans espace' }]
+      : []),
   ];
   const current = spaces.some(a => a.area_id === space)
     ? space
     : spaces[0]?.area_id ?? null;
-  const mine = inApp.filter(d => current === null || (d.areaId ?? NONE) === current);
-  // Caméra de l'espace courant (flux SD `_sd` préféré : plus stable en 4G)
-  const cams = mine.flatMap(d => d.entities).filter(e => e.startsWith('camera.'));
+  const mine = inApp.filter(
+    d => current === null || (d.areaId ?? NONE) === current,
+  );
+  // Caméra de l'appareil ouvert seulement (flux SD `_sd` préféré : plus stable en 4G)
+  const opened = mine.find(d => d.id === openId) ?? null;
+  const cams = (opened?.entities ?? []).filter(e => e.startsWith('camera.'));
+  // Bilan global (tous espaces) : appareils hors ligne ou silencieux
+  const issues = inApp.filter(d => health(d, states).level !== 'ok');
   const camera = cams.find(e => e.endsWith('_sd')) ?? cams[0] ?? null;
-  const showCamera = camera !== null;
 
   // Vidéo HLS ; en cas d'échec, repli sur le snapshot HA rafraîchi chaque seconde
   const [stream, setStream] = useState<string | null>(null);
@@ -194,7 +210,8 @@ function Home({
   // Nouvelle URL = retour au direct : au lancement, au retour au premier plan, et après une erreur
   const openStream = useCallback(() => {
     setStream(null);
-    if (camera) hlsUrl(camera).then(setStream, e => setError(`Vidéo : ${e.message}`));
+    if (camera)
+      hlsUrl(camera).then(setStream, e => setError(`Vidéo : ${e.message}`));
   }, [camera]);
   useEffect(() => {
     openStream();
@@ -230,6 +247,50 @@ function Home({
     }
   };
 
+  const video = camera && (
+    <View style={s.videoBox}>
+      {
+        <View style={s.live}>
+          <View style={s.liveDot} />
+          <Text style={s.liveTxt}>EN DIRECT</Text>
+        </View>
+      }
+      {stream ? (
+        <Video
+          style={s.camera}
+          source={{
+            uri: stream,
+            // Petit tampon + vitesse ajustée pour rester ~2 s derrière le direct (sinon dérive de minutes)
+            bufferConfig: {
+              minBufferMs: 1000,
+              maxBufferMs: 4000,
+              bufferForPlaybackMs: 500,
+              bufferForPlaybackAfterRebufferMs: 1000,
+              live: {
+                targetOffsetMs: 2000,
+                maxOffsetMs: 6000,
+                maxPlaybackSpeed: 1.1,
+              },
+            },
+          }}
+          muted
+          resizeMode="contain"
+          onError={() => setTimeout(openStream, 2000)}
+        />
+      ) : (
+        // entity_picture = URL signée par HA (token tournant, rafraîchi avec les états)
+        <Image
+          style={s.camera}
+          fadeDuration={0}
+          source={{
+            uri: `${HA_URL}${
+              states[camera!]?.attributes.entity_picture
+            }&t=${frame}`,
+          }}
+        />
+      )}
+    </View>
+  );
 
   // Grille responsive : colonnes de ~170 px min, contenu centré et borné sur tablette
   const { width } = useWindowDimensions();
@@ -239,7 +300,10 @@ function Home({
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+      <StatusBar
+        barStyle={C.dark ? 'light-content' : 'dark-content'}
+        backgroundColor={C.bg}
+      />
       <SafeAreaView style={s.root}>
         <ScrollView
           contentContainerStyle={s.content}
@@ -255,24 +319,81 @@ function Home({
               {admin && (
                 <Pressable
                   onPress={() => setAdding(true)}
+                  accessibilityLabel="Ajouter un appareil"
                   style={({ pressed }) => [s.add, pressed && { opacity: 0.6 }]}
                 >
                   <Text style={s.addTxt}>＋</Text>
                 </Pressable>
               )}
-              <Pressable onPress={onLogout} style={s.add}>
-                <Text style={s.addTxt}>⎋</Text>
+              <Pressable
+                accessibilityLabel="Menu"
+                onPress={() =>
+                  Alert.alert(
+                    'IoTrigger',
+                    admin ? 'Administrateur' : 'Lecture seule',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Se déconnecter',
+                        style: 'destructive',
+                        onPress: onLogout,
+                      },
+                    ],
+                  )
+                }
+                style={({ pressed }) => [s.add, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={s.addTxt}>⋯</Text>
               </Pressable>
             </View>
           </View>
           {error && <Text style={s.error}>{error}</Text>}
+          {/* État de la chaîne en un coup d'œil ; toucher = ouvrir le premier appareil en défaut */}
+          {devices.length > 0 && (
+            <Pressable
+              disabled={!issues.length}
+              onPress={() => {
+                setSpace(issues[0].areaId ?? NONE);
+                setOpenId(issues[0].id);
+              }}
+              style={s.status}
+            >
+              <View
+                style={[
+                  s.statusDot,
+                  {
+                    backgroundColor: error
+                      ? C.red
+                      : issues.length
+                      ? C.orange
+                      : C.green,
+                  },
+                ]}
+              />
+              <Text style={s.statusTxt}>
+                {error
+                  ? 'Serveur injoignable'
+                  : issues.length
+                  ? `${issues.length} appareil(s) à vérifier : ${issues
+                      .map(d => d.name)
+                      .join(', ')}`
+                  : 'Tout est connecté'}
+              </Text>
+            </Pressable>
+          )}
 
-          <ScrollView horizontal contentContainerStyle={s.tabs}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.tabs}
+          >
             {spaces.map(a => (
               <Pressable
                 key={a.area_id}
                 onPress={() => setSpace(a.area_id)}
-                onLongPress={() => admin && a.area_id !== NONE && setEditSpace(a)}
+                onLongPress={() =>
+                  admin && a.area_id !== NONE && setEditSpace(a)
+                }
                 style={[s.tab, a.area_id === current && s.tabOn]}
               >
                 <Text style={[s.tabTxt, a.area_id === current && s.tabTxtOn]}>
@@ -297,43 +418,12 @@ function Home({
             )}
           </ScrollView>
 
-          {!showCamera ? null : stream ? (
-            <Video
-              style={s.camera}
-              source={{
-                uri: stream,
-                // Petit tampon + vitesse ajustée pour rester ~2 s derrière le direct (sinon dérive de minutes)
-                bufferConfig: {
-                  minBufferMs: 1000,
-                  maxBufferMs: 4000,
-                  bufferForPlaybackMs: 500,
-                  bufferForPlaybackAfterRebufferMs: 1000,
-                  live: {
-                    targetOffsetMs: 2000,
-                    maxOffsetMs: 6000,
-                    maxPlaybackSpeed: 1.1,
-                  },
-                },
-              }}
-              muted
-              resizeMode="contain"
-              onError={() => setTimeout(openStream, 2000)}
-            />
-          ) : (
-            // entity_picture = URL signée par HA (token tournant, rafraîchi avec les états)
-            <Image
-              style={s.camera}
-              fadeDuration={0}
-              source={{
-                uri: `${HA_URL}${states[camera!]?.attributes.entity_picture}&t=${frame}`,
-              }}
-            />
-          )}
-
           <Text style={s.section}>Appareils</Text>
           {mine.length === 0 && !loading && (
             <Text style={s.hint}>
-              {admin ? 'Touchez ＋ pour ajouter un appareil.' : 'Aucun appareil partagé.'}
+              {admin
+                ? 'Touchez ＋ pour ajouter un appareil.'
+                : 'Aucun appareil partagé.'}
             </Text>
           )}
           <View style={s.grid}>
@@ -352,7 +442,8 @@ function Home({
         </ScrollView>
 
         <DeviceSheet
-          device={mine.find(d => d.id === openId) ?? null}
+          device={opened}
+          video={video}
           states={states}
           onClose={() => setOpenId(null)}
           onChange={refresh}
@@ -421,16 +512,21 @@ const s = StyleSheet.create({
   },
   title: { color: C.text, fontSize: 34, fontWeight: '700' },
   add: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: C.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addTxt: { color: '#007aff', fontSize: 24 },
+  addTxt: { color: C.blue, fontSize: 24 },
   actions: { flexDirection: 'row', gap: 8 },
-  login: { alignItems: 'center', justifyContent: 'center', gap: 24, padding: 32 },
+  login: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    padding: 32,
+  },
   logo: { width: 120, height: 120, borderRadius: 28 },
   loginBtn: {
     backgroundColor: C.text,
@@ -440,18 +536,38 @@ const s = StyleSheet.create({
   },
   loginTxt: { color: C.card, fontSize: 17, fontWeight: '600' },
   error: {
-    color: '#c0392b',
-    backgroundColor: '#fdecea',
+    color: C.red,
+    backgroundColor: C.card,
     padding: 12,
     borderRadius: 12,
   },
   camera: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 20,
+    borderRadius: 16,
     backgroundColor: '#000',
   },
-  section: { color: C.text, fontSize: 22, fontWeight: '700', marginTop: 8 },
+  section: { color: C.text, fontSize: 20, fontWeight: '700', marginTop: 8 },
+  status: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: C.card,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusTxt: { color: C.text, fontSize: 15, flex: 1 },
+  videoBox: { gap: 8 },
+  live: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: -4,
+  },
+  liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.red },
+  liveTxt: { color: C.muted, fontSize: 12, fontWeight: '600' },
   hint: { color: C.muted, fontSize: 15 },
   tabs: { gap: 8 },
   tab: {

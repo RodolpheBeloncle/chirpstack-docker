@@ -1,4 +1,5 @@
 import {
+  Appearance,
   Image,
   Modal,
   Pressable,
@@ -14,15 +15,49 @@ import { Area, callService, Device, EntityState } from './ha';
 
 type States = Record<string, EntityState>;
 
+// Couleurs système iOS (clair / sombre). ponytail: thème lu au lancement, Appearance listener si bascule à chaud nécessaire
+const dark = Appearance.getColorScheme() === 'dark';
+export const C = dark
+  ? {
+      bg: '#000000',
+      card: '#1c1c1e',
+      tile: '#2c2c2e',
+      fill: '#3a3a3c',
+      text: '#ffffff',
+      muted: '#8e8e93',
+      sep: '#38383a',
+      green: '#30d158',
+      orange: '#ff9f0a',
+      red: '#ff453a',
+      blue: '#0a84ff',
+      dark,
+    }
+  : {
+      bg: '#f2f2f7',
+      card: '#ffffff',
+      tile: '#e5e5ea',
+      fill: '#f2f2f7',
+      text: '#000000',
+      muted: '#8e8e93',
+      sep: '#c6c6c8',
+      green: '#34c759',
+      orange: '#ff9500',
+      red: '#ff3b30',
+      blue: '#007aff',
+      dark,
+    };
+
 const domain = (id: string) => id.split('.')[0];
 const TOGGLE = ['switch', 'light', 'fan', 'input_boolean'];
+const DEAD = ['unknown', 'unavailable'];
 const label = (st?: EntityState) => st?.attributes.friendly_name ?? '';
 const value = (st?: EntityState) =>
   !st
     ? '…'
-    : ['unknown', 'unavailable'].includes(st.state)
+    : DEAD.includes(st.state)
     ? '—'
     : `${st.state} ${st.attributes.unit_of_measurement ?? ''}`.trim();
+const cls = (st?: EntityState) => st?.attributes.device_class;
 
 // Nom d'entité sans le préfixe du nom de l'appareil (« Sonde Humidité » → « Humidité »)
 const short = (st: EntityState | undefined, dev: Device) =>
@@ -44,13 +79,48 @@ const ICONS: Record<string, string> = {
 };
 const icon = (d: Device, states: States) => {
   for (const e of d.entities) {
-    const k =
-      (states[e]?.attributes as { device_class?: string })?.device_class ??
-      domain(e);
+    const k = cls(states[e]) ?? domain(e);
     if (ICONS[k]) return ICONS[k];
   }
   return '◻️';
 };
+
+export const ago = (ms: number) => {
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "à l'instant";
+  if (m < 60) return `il y a ${m} min`;
+  if (m < 1440) return `il y a ${Math.round(m / 60)} h`;
+  return `il y a ${Math.round(m / 1440)} j`;
+};
+
+// Santé : hors ligne si toutes les entités sont indisponibles ; LoRaWAN en retard sans trame depuis 2 h
+// ponytail: seuil LoRa fixe (SE01-LS ≈ 20 min), le lire de l'intervalle d'envoi si plusieurs profils
+const LORA_LATE_MS = 2 * 3600 * 1000;
+export type Level = 'ok' | 'late' | 'off';
+export function health(d: Device, states: States, now = Date.now()) {
+  const sts = d.entities.map(e => states[e]).filter(Boolean);
+  const seen = Math.max(
+    0,
+    ...sts.map(
+      st => Date.parse(st.last_reported ?? st.last_updated ?? '') || 0,
+    ),
+  );
+  const level: Level =
+    sts.length && sts.every(st => st.state === 'unavailable')
+      ? 'off'
+      : d.protocol === 'LoRaWAN' && now - seen > LORA_LATE_MS
+      ? 'late'
+      : 'ok';
+  const text =
+    level === 'off'
+      ? 'Hors ligne'
+      : level === 'late'
+      ? 'En retard'
+      : 'Connecté';
+  return { level, text, seen };
+}
+export const levelColor = (l: Level) =>
+  l === 'ok' ? C.green : l === 'late' ? C.orange : C.red;
 
 export function DeviceCard({
   device,
@@ -69,39 +139,59 @@ export function DeviceCard({
 }) {
   const toggle = device.entities.find(e => TOGGLE.includes(domain(e)));
   const on = isOn(states[toggle ?? '']);
-  // Résumé : 2 premières mesures, sinon état de l'interrupteur
+  const h = health(device, states);
+  // Résumé : santé si problème, sinon 2 premières mesures, sinon état de l'interrupteur
   const summary =
-    device.entities
-      .filter(e => ['sensor', 'binary_sensor'].includes(domain(e)))
-      .slice(0, 2)
-      .map(e => value(states[e]))
-      .join(' · ') || (toggle ? (on ? 'Activé' : 'Désactivé') : '');
+    h.level !== 'ok'
+      ? h.text
+      : device.entities
+          .filter(
+            e =>
+              ['sensor', 'binary_sensor'].includes(domain(e)) &&
+              cls(states[e]) !== 'signal_strength',
+          )
+          .slice(0, 2)
+          .map(e => value(states[e]))
+          .join(' · ') || (toggle ? (on ? 'Activé' : 'Désactivé') : '');
   return (
     <Pressable
       onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`${device.name}, ${summary}`}
       style={({ pressed }) => [
         s.card,
         { width },
         on && s.cardOn,
+        h.level === 'off' && s.cardOff,
         pressed && s.pressed,
       ]}
     >
       <Pressable
         disabled={!toggle || readOnly}
         hitSlop={8}
+        accessibilityLabel={on ? 'Éteindre' : 'Allumer'}
         onPress={() =>
           toggle &&
           callService(toggle, on ? 'turn_off' : 'turn_on').then(onChange)
         }
-        style={[s.icon, on && s.iconOn]}
+        style={[s.icon, on && { backgroundColor: C.green }]}
       >
         <Text style={s.iconTxt}>{icon(device, states)}</Text>
+        {h.level !== 'ok' && (
+          <View style={[s.dot, { backgroundColor: levelColor(h.level) }]} />
+        )}
       </Pressable>
-      <View>
-        <Text style={[s.name, on && s.nameOn]} numberOfLines={1}>
+      <View style={s.flex}>
+        <Text style={s.name} numberOfLines={1}>
           {device.name}
         </Text>
-        <Text style={[s.summary, on && s.summaryOn]} numberOfLines={1}>
+        <Text
+          style={[
+            s.summary,
+            h.level !== 'ok' && { color: levelColor(h.level) },
+          ]}
+          numberOfLines={1}
+        >
           {summary}
         </Text>
       </View>
@@ -136,6 +226,7 @@ function Control({
     control = (
       <Switch
         value={st?.state === 'on'}
+        trackColor={{ true: C.green }}
         onValueChange={v => call(v ? 'turn_on' : 'turn_off')}
       />
     );
@@ -148,11 +239,19 @@ function Control({
       });
     control = (
       <View style={s.stepper}>
-        <Pressable style={s.stepBtn} onPress={() => set(n - step)}>
+        <Pressable
+          style={s.stepBtn}
+          accessibilityLabel="Diminuer"
+          onPress={() => set(n - step)}
+        >
           <Text style={s.stepTxt}>−</Text>
         </Pressable>
         <Text style={s.rowValue}>{value(st)}</Text>
-        <Pressable style={s.stepBtn} onPress={() => set(n + step)}>
+        <Pressable
+          style={s.stepBtn}
+          accessibilityLabel="Augmenter"
+          onPress={() => set(n + step)}
+        >
           <Text style={s.stepTxt}>+</Text>
         </Pressable>
       </View>
@@ -205,6 +304,87 @@ function Control({
   );
 }
 
+// Ligne de liste groupée iOS (libellé à gauche, valeur à droite)
+function Row({
+  k,
+  v,
+  color,
+  last,
+}: {
+  k: string;
+  v: string;
+  color?: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[s.row, last && s.rowLast]}>
+      <Text style={s.rowLabel}>{k}</Text>
+      <View style={s.rowRight}>
+        {color && <View style={[s.dotInline, { backgroundColor: color }]} />}
+        <Text style={s.rowValue}>{v}</Text>
+      </View>
+    </View>
+  );
+}
+
+const Header = ({ children }: { children: string }) => (
+  <Text style={s.header}>{children.toUpperCase()}</Text>
+);
+
+// Fiche santé : protocole, statut, dernière activité, signal radio, batterie
+function Health({ device, states }: { device: Device; states: States }) {
+  const h = health(device, states);
+  const find = (c: string) =>
+    device.entities
+      .map(e => states[e])
+      .filter(st => cls(st) === c && !DEAD.includes(st!.state));
+  const signal = find('signal_strength')
+    .map(st => value(st))
+    .join(' · ');
+  const battery = [...find('battery'), ...find('voltage')][0];
+  const rows: [string, string, string?][] = [
+    ['Protocole', device.protocol],
+    ['Statut', h.text, levelColor(h.level)],
+    ['Dernière activité', h.seen ? ago(Date.now() - h.seen) : '—'],
+  ];
+  if (signal) rows.push(['Signal', signal]);
+  if (battery) rows.push(['Batterie', value(battery)]);
+  return (
+    <View>
+      <Header>Connexion</Header>
+      <View style={s.group}>
+        {rows.map(([k, v, c], i) => (
+          <Row key={k} k={k} v={v} color={c} last={i === rows.length - 1} />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function SheetHead({
+  title,
+  sub,
+  action,
+  onClose,
+}: {
+  title: string;
+  sub?: string;
+  action: string;
+  onClose: () => void;
+}) {
+  return (
+    <View style={s.sheetHead}>
+      <View style={s.flex}>
+        {!!sub && <Text style={s.sub}>{sub}</Text>}
+        <Text style={s.sheetTitle}>{title}</Text>
+      </View>
+      <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button">
+        <Text style={s.link}>{action}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export function DeviceSheet({
   device,
   states,
@@ -215,7 +395,9 @@ export function DeviceSheet({
   onArea,
   onRename,
   readOnly,
+  video,
 }: {
+  video?: React.ReactNode;
   device: Device | null;
   states: States;
   onClose: () => void;
@@ -226,6 +408,12 @@ export function DeviceSheet({
   onRename: (d: Device, name: string) => void;
   readOnly: boolean;
 }) {
+  // Le signal radio est affiché dans la fiche santé, la caméra en direct en tête (prop video)
+  const controls = device?.entities.filter(
+    e =>
+      cls(states[e]) !== 'signal_strength' &&
+      !(video && domain(e) === 'camera'),
+  );
   return (
     <Modal
       visible={!!device}
@@ -235,59 +423,77 @@ export function DeviceSheet({
     >
       {device && (
         <ScrollView style={s.sheet} contentContainerStyle={s.sheetContent}>
-          <View style={s.sheetHead}>
-            <View style={s.flex}>
-              <Text style={s.area}>{device.area}</Text>
-              <Text style={s.sheetTitle}>{device.name}</Text>
-            </View>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Text style={s.link}>OK</Text>
-            </Pressable>
-          </View>
-          <View style={s.group}>
-            {device.entities.map(id => (
-              <Control
-                key={id}
-                id={id}
-                st={states[id]}
-                dev={device}
-                onChange={onChange}
-                readOnly={readOnly}
-              />
-            ))}
-          </View>
-          {!readOnly && (
-          <>
-          <Text style={s.area}>Nom</Text>
-          <TextInput
-            key={device.id}
-            defaultValue={device.name}
-            onEndEditing={e => {
-              const n = e.nativeEvent.text.trim();
-              if (n && n !== device.name) onRename(device, n);
-            }}
-            style={[s.group, s.input]}
+          <SheetHead
+            title={device.name}
+            sub={device.area}
+            action="OK"
+            onClose={onClose}
           />
-          <Text style={s.area}>Espace</Text>
-          <View style={s.chips}>
-            {areas.map(a => (
+          {video}
+          {controls!.length > 0 && (
+            <View>
+              <Header>Mesures et commandes</Header>
+              <View style={s.group}>
+                {controls!.map(id => (
+                  <Control
+                    key={id}
+                    id={id}
+                    st={states[id]}
+                    dev={device}
+                    onChange={onChange}
+                    readOnly={readOnly}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
+          <Health device={device} states={states} />
+          {!readOnly && (
+            <>
+              <View>
+                <Header>Nom</Header>
+                <TextInput
+                  key={device.id}
+                  defaultValue={device.name}
+                  onEndEditing={e => {
+                    const n = e.nativeEvent.text.trim();
+                    if (n && n !== device.name) onRename(device, n);
+                  }}
+                  style={[s.group, s.input]}
+                />
+              </View>
+              <View>
+                <Header>Espace</Header>
+                <View style={s.chips}>
+                  {areas.map(a => (
+                    <Pressable
+                      key={a.area_id}
+                      style={[
+                        s.chip,
+                        s.chipCard,
+                        device.areaId === a.area_id && s.chipOn,
+                      ]}
+                      onPress={() => onArea(device, a.area_id)}
+                    >
+                      <Text
+                        style={[
+                          s.chipTxt,
+                          device.areaId === a.area_id && s.chipTxtOn,
+                        ]}
+                      >
+                        {a.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
               <Pressable
-                key={a.area_id}
-                style={[s.chip, device.areaId === a.area_id && s.chipOn]}
-                onPress={() => onArea(device, a.area_id)}
+                onPress={() => onRemove(device)}
+                style={[s.group, s.remove]}
               >
-                <Text
-                  style={[s.chipTxt, device.areaId === a.area_id && s.chipTxtOn]}
-                >
-                  {a.name}
-                </Text>
+                <Text style={s.removeTxt}>Retirer de l'app</Text>
               </Pressable>
-            ))}
-          </View>
-          <Pressable onPress={() => onRemove(device)} style={s.remove}>
-            <Text style={s.removeTxt}>Retirer de l'app</Text>
-          </Pressable>
-          </>
+            </>
           )}
         </ScrollView>
       )}
@@ -318,29 +524,28 @@ export function SpaceSheet({
     >
       {area && (
         <ScrollView style={s.sheet} contentContainerStyle={s.sheetContent}>
-          <View style={s.sheetHead}>
-            <Text style={[s.sheetTitle, s.flex]}>Espace</Text>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Text style={s.link}>OK</Text>
-            </Pressable>
+          <SheetHead title="Espace" action="OK" onClose={onClose} />
+          <View>
+            <Header>Nom</Header>
+            <TextInput
+              defaultValue={area.name}
+              onEndEditing={e => {
+                const n = e.nativeEvent.text.trim();
+                if (n && n !== area.name) onRename(n);
+              }}
+              style={[s.group, s.input]}
+            />
+            <Text style={s.footer}>{count} appareil(s) dans cet espace.</Text>
           </View>
-          <Text style={s.area}>Nom</Text>
-          <TextInput
-            defaultValue={area.name}
-            onEndEditing={e => {
-              const n = e.nativeEvent.text.trim();
-              if (n && n !== area.name) onRename(n);
-            }}
-            style={[s.group, s.input]}
-          />
-          <Text style={s.hint}>{count} appareil(s) dans cet espace.</Text>
-          <Pressable onPress={onDelete} style={s.remove}>
-            <Text style={s.removeTxt}>Supprimer l'espace</Text>
-          </Pressable>
-          <Text style={s.hint}>
-            Les appareils ne sont pas supprimés : ils passent dans l'onglet
-            « Sans espace ».
-          </Text>
+          <View>
+            <Pressable onPress={onDelete} style={[s.group, s.remove]}>
+              <Text style={s.removeTxt}>Supprimer l'espace</Text>
+            </Pressable>
+            <Text style={s.footer}>
+              Les appareils ne sont pas supprimés : ils passent dans l'onglet «
+              Sans espace ».
+            </Text>
+          </View>
         </ScrollView>
       )}
     </Modal>
@@ -367,103 +572,120 @@ export function AddSheet({
       onRequestClose={onClose}
     >
       <ScrollView style={s.sheet} contentContainerStyle={s.sheetContent}>
-        <View style={s.sheetHead}>
-          <Text style={[s.sheetTitle, s.flex]}>Ajouter un appareil</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
-            <Text style={s.link}>Fermer</Text>
-          </Pressable>
-        </View>
-        {devices.length === 0 && (
-          <Text style={s.hint}>
+        <SheetHead
+          title="Ajouter un appareil"
+          action="Fermer"
+          onClose={onClose}
+        />
+        {devices.length === 0 ? (
+          <Text style={s.footer}>
             Aucun nouvel appareil. Un ESP32 flashé avec ESPHome, ou un capteur
             LoRa ajouté dans ChirpStack, apparaît ici dès que Home Assistant le
             découvre.
           </Text>
+        ) : (
+          <View style={s.group}>
+            {devices.map((d, i) => (
+              <Pressable
+                key={d.id}
+                style={({ pressed }) => [
+                  s.row,
+                  i === devices.length - 1 && s.rowLast,
+                  pressed && { backgroundColor: C.fill },
+                ]}
+                onPress={() => onAdd(d)}
+              >
+                <View style={s.flex}>
+                  <Text style={s.rowLabel}>{d.name}</Text>
+                  <Text style={s.hint}>
+                    {[d.protocol, d.area, `${d.entities.length} entité(s)`]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Text>
+                </View>
+                <Text style={s.plus}>＋</Text>
+              </Pressable>
+            ))}
+          </View>
         )}
-        <View style={s.group}>
-          {devices.map(d => (
-            <Pressable key={d.id} style={s.row} onPress={() => onAdd(d)}>
-              <View style={s.flex}>
-                <Text style={s.rowLabel}>{d.name}</Text>
-                <Text style={s.hint}>
-                  {[d.area, `${d.entities.length} entité(s)`]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              </View>
-              <Text style={s.plus}>＋</Text>
-            </Pressable>
-          ))}
-        </View>
       </ScrollView>
     </Modal>
   );
 }
 
-export const C = {
-  bg: '#f2f2f7',
-  card: '#ffffff',
-  text: '#1c1c1e',
-  muted: '#8e8e93',
-  accent: '#34c759',
-  sep: '#e5e5ea',
-};
-
 const s = StyleSheet.create({
   flex: { flex: 1 },
+  // Tuile Apple Home : icône ronde à gauche, nom + état à droite
   card: {
-    aspectRatio: 1.15,
-    backgroundColor: C.card,
-    borderRadius: 22,
-    padding: 14,
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    height: 72,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: C.tile,
+    borderRadius: 16,
+    paddingHorizontal: 12,
   },
-  cardOn: { backgroundColor: '#ffffff', borderWidth: 2, borderColor: C.accent },
-  pressed: { opacity: 0.75, transform: [{ scale: 0.97 }] },
+  cardOn: { backgroundColor: C.card },
+  cardOff: { opacity: 0.55 },
+  pressed: { transform: [{ scale: 0.96 }] },
   icon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: C.bg,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: C.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconOn: { backgroundColor: '#d8f5df' },
-  iconTxt: { fontSize: 22 },
-  name: { color: C.text, fontSize: 16, fontWeight: '600' },
-  nameOn: { color: C.text },
-  summary: { color: C.muted, fontSize: 14, marginTop: 2 },
-  summaryOn: { color: '#248a3d', fontWeight: '600' },
-  area: { color: C.muted, fontSize: 13, fontWeight: '500' },
+  iconTxt: { fontSize: 20 },
+  dot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: C.tile,
+  },
+  dotInline: { width: 8, height: 8, borderRadius: 4 },
+  name: { color: C.text, fontSize: 15, fontWeight: '600' },
+  summary: { color: C.muted, fontSize: 13, marginTop: 1 },
+  sub: { color: C.muted, fontSize: 13, fontWeight: '500' },
+  header: {
+    color: C.muted,
+    fontSize: 13,
+    marginLeft: 16,
+    marginBottom: 6,
+  },
+  footer: { color: C.muted, fontSize: 13, marginHorizontal: 16, marginTop: 6 },
   sheet: { flex: 1, backgroundColor: C.bg },
-  sheetContent: { padding: 20, gap: 16 },
+  sheetContent: { padding: 16, gap: 28 },
   sheetHead: { flexDirection: 'row', alignItems: 'flex-start' },
   sheetTitle: { color: C.text, fontSize: 28, fontWeight: '700' },
-  link: { color: '#007aff', fontSize: 17, fontWeight: '600' },
-  group: { backgroundColor: C.card, borderRadius: 14, overflow: 'hidden' },
+  link: { color: C.blue, fontSize: 17, fontWeight: '600' },
+  group: { backgroundColor: C.card, borderRadius: 12, overflow: 'hidden' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    padding: 16,
+    minHeight: 44,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.sep,
   },
+  rowLast: { borderBottomWidth: 0 },
   rowWide: { flexDirection: 'column', alignItems: 'flex-start' },
-  rowLabel: { color: C.text, fontSize: 16 },
-  rowValue: { color: C.muted, fontSize: 16 },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowLabel: { color: C.text, fontSize: 17 },
+  rowValue: { color: C.muted, fontSize: 17 },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   stepBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: C.bg,
+    backgroundColor: C.fill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -473,22 +695,23 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: C.bg,
+    backgroundColor: C.fill,
   },
-  chipOn: { backgroundColor: C.accent },
+  chipCard: { backgroundColor: C.card },
+  chipOn: { backgroundColor: C.blue },
   chipTxt: { color: C.text, fontSize: 15 },
   chipTxtOn: { color: '#fff', fontWeight: '600' },
   action: {
-    backgroundColor: C.bg,
+    backgroundColor: C.fill,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 16,
   },
-  actionTxt: { color: '#007aff', fontSize: 15, fontWeight: '600' },
+  actionTxt: { color: C.blue, fontSize: 15, fontWeight: '600' },
   camera: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' },
   remove: { alignItems: 'center', padding: 14 },
-  removeTxt: { color: '#ff3b30', fontSize: 16 },
-  hint: { color: C.muted, fontSize: 14 },
-  plus: { color: '#007aff', fontSize: 24 },
-  input: { color: C.text, fontSize: 16, padding: 16 },
+  removeTxt: { color: C.red, fontSize: 17 },
+  hint: { color: C.muted, fontSize: 13 },
+  plus: { color: C.blue, fontSize: 24 },
+  input: { color: C.text, fontSize: 17, padding: 14 },
 });

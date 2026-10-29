@@ -61,11 +61,14 @@
           Bat: { name: Batterie, unit: "V", class: voltage }
         fields: "{{ trigger.payload_json.object.items() | rejectattr(1, 'mapping') | map(attribute=0) | list }}"
     - repeat:
-        for_each: "{{ fields + ['snr'] }}"
+        for_each: "{{ fields + ['snr', 'rssi'] }}"
         sequence:
           - variables:
-              k: "{{ known.get(repeat.item, {'name': 'Signal (SNR)', 'unit': 'dB', 'class': 'signal_strength'} if repeat.item == 'snr' else {}) }}"
-              path: "{{ 'rxInfo[0].snr' if repeat.item == 'snr' else 'object.' ~ repeat.item }}"
+              radio:
+                snr: { name: Signal (SNR), unit: dB, class: signal_strength }
+                rssi: { name: Signal (RSSI), unit: dBm, class: signal_strength }
+              k: "{{ radio.get(repeat.item) or known.get(repeat.item, {}) }}"
+              path: "{{ 'rxInfo[0].' ~ repeat.item if repeat.item in radio else 'object.' ~ repeat.item }}"
           - action: mqtt.publish
             data:
               topic: "homeassistant/sensor/{{ info.devEui }}/{{ repeat.item }}/config"
