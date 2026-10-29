@@ -1,6 +1,6 @@
 # HANDOFF — système jardin connecté (pour la prochaine session IA)
 
-Lire ce fichier en premier. Mis à jour : 2026-10-24.
+Lire ce fichier en premier. Mis à jour : 2026-10-29.
 
 ## Objectif utilisateur
 
@@ -89,6 +89,16 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
 - SSH serveur (2026-10-27) : **root interdit** sauf depuis le réseau Coolify `10.0.0.0/16` (`/etc/ssh/sshd_config.d/10-root.conf`) → se connecter en `rodolphe@31.70.69.194` + `sudo` (NOPASSWD). Vérifié : Coolify se connecte en root depuis 10.0.1.16, services healthy. fail2ban `ignoreip` en place.
   fail2ban bannit 1 h après 5 échecs/10 min (SSH en « Connection refused ») : débannir via terminal Coolify ou console hébergeur `fail2ban-client set sshd unbanip <IP>` ; whitelist `ignoreip` dans `/etc/fail2ban/jail.local` (IP maison 86.219.52.199, change si la box change d'IP).
 
+- **MQTT ESP32 via 443** (2026-10-29) : Livebox bloque 8883 en sortie → Traefik TCP passthrough SNI `mqtt.triggerstudio.dev:443` → mosquitto:8883 (labels `traefik.tcp.routers.mqtt-tls` dans le compose). 8883 et 2222 fermés (IONOS, ufw, compose). ESP32 `sonde-jardin` connecté (`esphome/sonde-jardin.yaml`, `port: 443`).
+- ESP32 `sonde-jardin` : signal sonde sur **D32** (GPIO32), D27 = sortie 3,3 V ; calibrée air 2,23 V → 0 %, eau 0,95 V → 100 % (capteur diag « Sonde tension brute »).
+- **Supervision infra** (2026-10-29) : `sensor.infra_*` (on/off + attribut `checked` = heure de vérif ; binary_sensor command_line refuse json_attributes) dans `configuration.yaml` (command_line curl/nc vers chirpstack, mosquitto,
+  go2rtc, frigate ; MQTT `expire_after 180` sur les stats `eu868/gateway/a84041fdfea3a5c3/event/stats` = Pi + tunnel). ACL HA : read `eu868/gateway/#`
+  (rechargée par `docker kill -s HUP` sur mosquitto). Alerte `iotrigger_notif_infra` (KO 2 min). App : onglet « Infra » admin seulement.
+  Passerelle = rouge tant que le Pi est éteint (normal).
+- Thème HA `iotrigger` (violet) : `/opt/jardin/configuration/homeassistant/themes/iotrigger.yaml`.
+- Doc BookStack (booknote.triggerstudio.dev, étagère « Documentation technique ») : n8n + Infrastructure ; CSS/Mermaid dans le setting `app-custom-head` (MariaDB, user `$MYSQL_USER`, puis `artisan cache:clear`).
+- GitLab recréé vide (données perdues 28/10) ; blog WordPress encore PHP 8.3.20 (`FROM` à passer en `wordpress:php8.4-apache`). Sauvegarde VPS : `~/Desktop/iot-backup/vps-2026-10-28/`.
+
 ## Prochaines étapes (ordre)
 
 1. **Tester l'app** sur le téléphone avec la démo (simulateur lancé, token HA dans `mobile/src/config.ts`).
@@ -109,7 +119,7 @@ Vanne : contrôleur d'électrovanne Dragino (modèle exact à confirmer).
   Discovery LoRa : RSSI ajouté (`automations_iotrigger.yaml`) → déployé sur le serveur 2026-10-29 (backup `.bak-20261029`).
 
 - Édition (2026-10-27) : fiche appareil = nom + espace + retirer ; appui long sur un onglet = renommer/supprimer l'espace (appareils sans espace → onglet « Sans espace »).
-- Un appareil HA apparaît dans l'app s'il porte le **libellé `app`** (bouton ＋ dans l'app, ou HA → Appareils → libellés).
+- Appareils ESPHome / MQTT / LoRaWAN : **dans l'app d'office** (retirer = libellé `hors-app`) ; autres appareils HA : libellé `app` (bouton ＋).
 - ESP32 : flasher ESPHome, l'adopter dans HA → il apparaît dans ＋. Contrôles auto par domaine (switch/light, number, select, button, cover, camera).
 - Vidéo : HLS avec tampon live ~2 s, réouverture au retour au premier plan/erreur. Latence plus basse = WebRTC (non fait).
 - Caméra TC55 : pas d'ONVIF ; PTZ éventuel via l'API hi3510 (identifiants admin requis, à tester si motorisée).

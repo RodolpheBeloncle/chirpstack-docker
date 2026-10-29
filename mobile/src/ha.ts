@@ -35,6 +35,7 @@ export const currentUser = () =>
 export type EntityState = {
   entity_id: string;
   state: string;
+  last_changed?: string;
   last_updated?: string;
   last_reported?: string;
   attributes: {
@@ -46,6 +47,7 @@ export type EntityState = {
     max?: number;
     step?: number;
     options?: string[];
+    checked?: string; // sondes infra : heure de la dernière vérification
   };
 };
 
@@ -120,8 +122,12 @@ const protocol = (d: any, entities: string[]) => {
 };
 
 const APP_LABEL = 'app';
+const HIDDEN_LABEL = 'hors-app';
+// Appareils IoT (ESPHome, MQTT, LoRaWAN via ChirpStack) : dans l'app d'office, sans libellé
+const AUTO_DOMAINS = ['mqtt', 'esphome'];
+const isAuto = (d: any) => AUTO_DOMAINS.includes(d.identifiers?.[0]?.[0]);
 
-// Appareils HA + leurs entités visibles. Un appareil est dans l'app s'il porte le libellé `app`.
+// Appareils HA + leurs entités visibles. Dans l'app : appareil IoT (sauf libellé `hors-app`) ou libellé `app`.
 export type Area = { area_id: string; name: string };
 
 // Espaces de l'app = pièces (areas) HA
@@ -146,7 +152,9 @@ export async function loadDevices(): Promise<{
         name: d.name_by_user ?? d.name,
         area: areaName[d.area_id] ?? '',
         areaId: d.area_id,
-        inApp: d.labels.includes(APP_LABEL),
+        inApp: isAuto(d)
+          ? !d.labels.includes(HIDDEN_LABEL)
+          : d.labels.includes(APP_LABEL),
         entities: ents,
         protocol: protocol(d, ents),
       };
@@ -178,15 +186,18 @@ export const setArea = (device: Device, areaId: string) =>
   });
 
 export async function setInApp(device: Device, inApp: boolean) {
-  const labels = await ws<any[]>('config/label_registry/list');
-  if (!labels.some(l => l.label_id === APP_LABEL))
-    await ws('config/label_registry/create', { name: APP_LABEL });
   const d = (await ws<any[]>('config/device_registry/list')).find(
     x => x.id === device.id,
   );
-  const others = d.labels.filter((l: string) => l !== APP_LABEL);
+  // appareil IoT : on marque l'exclusion ; autre appareil : on marque l'inclusion
+  const label = isAuto(d) ? HIDDEN_LABEL : APP_LABEL;
+  const tagged = isAuto(d) ? !inApp : inApp;
+  const labels = await ws<any[]>('config/label_registry/list');
+  if (!labels.some(l => l.label_id === label))
+    await ws('config/label_registry/create', { name: label });
+  const others = d.labels.filter((l: string) => l !== label);
   await ws('config/device_registry/update', {
     device_id: device.id,
-    labels: inApp ? [...others, APP_LABEL] : others,
+    labels: tagged ? [...others, label] : others,
   });
 }

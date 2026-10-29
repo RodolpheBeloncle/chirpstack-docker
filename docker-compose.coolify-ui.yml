@@ -237,12 +237,13 @@ services:
       start_period: 60s
     networks:
       default: null
-    # MQTT TLS public : ESP32 (compte esphome) depuis n'importe quel réseau
-    ports:
-      - mode: ingress
-        protocol: tcp
-        published: "8883"
-        target: 8883
+    # MQTT TLS aussi sur 443 : Traefik route par SNI mqtt.triggerstudio.dev sans déchiffrer (passthrough)
+    labels:
+      - traefik.enable=true
+      - traefik.tcp.routers.mqtt-tls.entrypoints=https
+      - traefik.tcp.routers.mqtt-tls.rule=HostSNI(`mqtt.triggerstudio.dev`)
+      - traefik.tcp.routers.mqtt-tls.tls.passthrough=true
+      - traefik.tcp.services.mqtt-tls.loadbalancer.server.port=8883
     restart: unless-stopped
     user: root
     volumes:

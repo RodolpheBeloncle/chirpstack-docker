@@ -42,6 +42,7 @@ import {
   C,
   DeviceCard,
   DeviceSheet,
+  ago,
   health,
   SpaceSheet,
 } from './src/Devices';
@@ -190,6 +191,7 @@ function Home({
     ...(inApp.some(d => !d.areaId)
       ? [{ area_id: NONE, name: 'Sans espace' }]
       : []),
+    ...(admin ? [{ area_id: INFRA, name: 'Infra' }] : []),
   ];
   const current = spaces.some(a => a.area_id === space)
     ? space
@@ -392,7 +394,7 @@ function Home({
                 key={a.area_id}
                 onPress={() => setSpace(a.area_id)}
                 onLongPress={() =>
-                  admin && a.area_id !== NONE && setEditSpace(a)
+                  admin && ![NONE, INFRA].includes(a.area_id) && setEditSpace(a)
                 }
                 style={[s.tab, a.area_id === current && s.tabOn]}
               >
@@ -418,27 +420,68 @@ function Home({
             )}
           </ScrollView>
 
-          <Text style={s.section}>Appareils</Text>
-          {mine.length === 0 && !loading && (
-            <Text style={s.hint}>
-              {admin
-                ? 'Touchez ＋ pour ajouter un appareil.'
-                : 'Aucun appareil partagé.'}
-            </Text>
+          {current === INFRA ? (
+            <>
+              <Text style={s.section}>Infrastructure</Text>
+              {/* (binary_)sensor.infra_* (HA : sondes serveur + stats de la passerelle LoRa) */}
+              {Object.values(states)
+                .filter(e => /^(binary_)?sensor\.infra_/.test(e.entity_id))
+                .map(e => (
+                  <View key={e.entity_id} style={s.status}>
+                    <View
+                      style={[
+                        s.statusDot,
+                        { backgroundColor: e.state === 'on' ? C.green : C.red },
+                      ]}
+                    />
+                    <Text style={s.statusTxt}>
+                      {(e.attributes.friendly_name ?? e.entity_id).replace(
+                        /^Infra /,
+                        '',
+                      )}
+                      {' · '}
+                      {e.state === 'on' ? 'OK' : 'hors service'}
+                      {/* depuis = dernier changement d'état ; vérifié = dernière sonde (60 s) */}
+                      {e.last_changed &&
+                        ` depuis ${ago(
+                          Date.now() - Date.parse(e.last_changed),
+                        ).replace('il y a ', '')}`}
+                      {(e.attributes.checked ?? e.last_reported) &&
+                        ` · vérifié ${ago(
+                          Date.now() -
+                            Date.parse(
+                              (e.attributes.checked ?? e.last_reported)!,
+                            ),
+                        )}`}
+                    </Text>
+                  </View>
+                ))}
+            </>
+          ) : (
+            <>
+              <Text style={s.section}>Appareils</Text>
+              {mine.length === 0 && !loading && (
+                <Text style={s.hint}>
+                  {admin
+                    ? 'Touchez ＋ pour ajouter un appareil.'
+                    : 'Aucun appareil partagé.'}
+                </Text>
+              )}
+              <View style={s.grid}>
+                {mine.map(d => (
+                  <DeviceCard
+                    key={d.id}
+                    device={d}
+                    states={states}
+                    width={cardW}
+                    onOpen={() => setOpenId(d.id)}
+                    onChange={refresh}
+                    readOnly={!admin}
+                  />
+                ))}
+              </View>
+            </>
           )}
-          <View style={s.grid}>
-            {mine.map(d => (
-              <DeviceCard
-                key={d.id}
-                device={d}
-                states={states}
-                width={cardW}
-                onOpen={() => setOpenId(d.id)}
-                onChange={refresh}
-                readOnly={!admin}
-              />
-            ))}
-          </View>
         </ScrollView>
 
         <DeviceSheet
@@ -495,6 +538,7 @@ function Home({
 
 const GAP = 12;
 const NONE = ''; // pseudo-espace des appareils sans pièce
+const INFRA = '__infra__'; // onglet admin : état des briques serveur
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },

@@ -8,6 +8,8 @@ user homeassistant
 topic readwrite application/#
 topic readwrite homeassistant/#
 topic read frigate/#
+# supervision infra : stats de la passerelle LoRa (Pi)
+topic read eu868/gateway/#
 # ESP32 (ESPHome, topic_prefix esphome/<nom>) : états + commandes
 topic readwrite esphome/#
 

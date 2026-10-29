@@ -79,3 +79,36 @@
                 {% if k.unit is defined %}{% set p = dict(p, unit_of_measurement=k.unit, state_class='measurement') %}{% endif %}
                 {% if k.class is defined %}{% set p = dict(p, device_class=k.class) %}{% endif %}
                 {{ p | tojson }}
+
+# Thème violet iotrigger par défaut (tous les utilisateurs, mode sombre)
+- id: iotrigger_theme_default
+  alias: "IoTrigger - thème par défaut"
+  mode: single
+  trigger:
+    - platform: homeassistant
+      event: start
+  action:
+    - service: frontend.set_theme
+      data:
+        name: iotrigger
+        mode: dark
+
+# Supervision infra : une brique (binary_sensor.infra_*) KO depuis 2 min → notification admin
+- id: iotrigger_notif_infra
+  alias: "Notification : brique infra en panne"
+  mode: parallel
+  trigger:
+    - platform: state
+      entity_id:
+        - sensor.infra_chirpstack
+        - sensor.infra_mosquitto
+        - sensor.infra_go2rtc
+        - sensor.infra_frigate
+        - binary_sensor.infra_passerelle_lora
+      to: ["off", "unavailable"]
+      for: "00:02:00"
+  action:
+    - event: iotrigger_notify
+      event_data:
+        title: "Infra : {{ trigger.to_state.name | replace(\"Infra \", \"\") }} hors service"
+        message: "Depuis {{ trigger.to_state.last_changed.astimezone().strftime(\"%H:%M\") }}"

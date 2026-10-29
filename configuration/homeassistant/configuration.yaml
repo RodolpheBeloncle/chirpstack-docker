@@ -11,22 +11,6 @@ automation iotrigger: !include automations_iotrigger.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
 
-# Capteurs LoRaWAN : créés automatiquement (automatisation iotrigger_lorawan_discovery, MQTT discovery).
-# Ici seulement les actionneurs (downlink), non découvrables.
-mqtt:
-  switch:
-    # ponytail: optimistic (pas de retour d'état), payload vanne factice ; mettre la vraie commande Dragino + state_topic quand la vanne existera
-    - name: "Vanne jardin"
-      unique_id: demo_vanne_jardin
-      command_topic: "application/demo/device/a840410000000002/command/down"
-      payload_on: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AQ=="}'
-      payload_off: '{"devEui":"a840410000000002","confirmed":true,"fPort":1,"data":"AA=="}'
-      optimistic: true
-      device:
-        identifiers: [a840410000000002]
-        name: "Vanne jardin"
-        manufacturer: Dragino
-
 # Dashboard "Jardin" éditable dans l'UI (mode storage, .storage/lovelace.dashboard_jardin sur le serveur)
 
 # Reverse proxy Traefik (Coolify) : HA 2026 ignore la section YAML `http:` (migrée dans .storage/http).
@@ -61,3 +45,41 @@ template:
         unique_id: iotrigger_notification
         # horodatage en tête : chaque notification change l'état, même identique à la précédente
         state: "{{ now().timestamp() | int }}|{{ trigger.event.data.title }}|{{ trigger.event.data.message }}"
+
+# Supervision infra (onglet Infra de l app, admin) : binary_sensor.infra_*
+command_line:
+  - sensor:
+      name: Infra ChirpStack
+      command: (curl -sf -o /dev/null -m 5 http://chirpstack:8080 && s=ON || s=OFF; echo "{\"state\":\"$s\",\"checked\":\"$(date -u +%FT%TZ)\"}")
+      value_template: "{{ value_json.state | lower }}"
+      json_attributes: [checked]
+      scan_interval: 60
+  - sensor:
+      name: Infra Mosquitto
+      command: (nc -z -w3 mosquitto 1883 && s=ON || s=OFF; echo "{\"state\":\"$s\",\"checked\":\"$(date -u +%FT%TZ)\"}")
+      value_template: "{{ value_json.state | lower }}"
+      json_attributes: [checked]
+      scan_interval: 60
+  - sensor:
+      name: Infra go2rtc
+      command: (curl -sf -o /dev/null -m 5 http://go2rtc:1984/api && s=ON || s=OFF; echo "{\"state\":\"$s\",\"checked\":\"$(date -u +%FT%TZ)\"}")
+      value_template: "{{ value_json.state | lower }}"
+      json_attributes: [checked]
+      scan_interval: 60
+  - sensor:
+      name: Infra Frigate
+      command: (curl -sf -o /dev/null -m 5 http://frigate:5000/api/version && s=ON || s=OFF; echo "{\"state\":\"$s\",\"checked\":\"$(date -u +%FT%TZ)\"}")
+      value_template: "{{ value_json.state | lower }}"
+      json_attributes: [checked]
+      scan_interval: 60
+
+mqtt:
+  binary_sensor:
+    # Passerelle LoRa (Pi) : stats toutes les ~30 s via le tunnel ; rien depuis 3 min = Pi/tunnel KO
+    - name: Infra Passerelle LoRa
+      unique_id: infra_passerelle_lora
+      state_topic: eu868/gateway/a84041fdfea3a5c3/event/stats
+      encoding: ""
+      value_template: "ON"
+      expire_after: 180
+      device_class: connectivity
